@@ -404,24 +404,17 @@ internal static class PublicPortalData
             !TryGetAuthenticatedPeerCharacter(
                 peer,
                 out ZDO character,
-                out long playerId))
+                out _))
         {
             return false;
         }
 
-        GameObject? liveCharacter = ZNetScene.instance.FindInstance(peer!.m_characterID);
-        Player? livePlayer = liveCharacter != null ? liveCharacter.GetComponent<Player>() : null;
-        ZNetView? liveView = liveCharacter != null ? liveCharacter.GetComponent<ZNetView>() : null;
-        if (livePlayer == null ||
-            liveView == null ||
-            !liveView.IsValid() ||
-            liveView.GetZDO() != character ||
-            livePlayer.GetZDOID() != peer.m_characterID ||
-            livePlayer.GetPlayerID() != playerId)
-        {
-            return false;
-        }
-
+        // A dedicated server can retain the authenticated character ZDO while
+        // its remote Player GameObject is outside the server's instantiated
+        // scene. The ZDO has already been bound to this ready peer, its owner,
+        // the Player prefab, and a non-zero playerID above, so requiring a live
+        // Unity instance here creates false denials without strengthening the
+        // identity or proximity checks.
         position = character.GetPosition();
         return IsFinite(position);
     }

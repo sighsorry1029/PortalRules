@@ -231,7 +231,6 @@ internal static partial class PublicPortalCatalog
     private const int MaximumOwnerIdLength = 128;
     private const int MaximumOwnerNameLength = 128;
     private const int MaximumClanIdLength = 128;
-    private const float MaximumAdminPortalPlacementDistance = 15f;
     private const float MaximumPortalCoordinateMagnitude = 1000000f;
     private const double MinimumQuaternionSqrMagnitude = 0.25d;
     private const double MaximumQuaternionSqrMagnitude = 4d;
@@ -386,9 +385,11 @@ internal static partial class PublicPortalCatalog
         {
             if (remoteIngress)
             {
-                PublicPortalServerPolicy.RejectUnverifiedPortal(
+                PublicPortalServerPolicy.RejectPortal(
                     zdo,
-                    _activePortalSync?.Peer);
+                    _activePortalSync?.Peer,
+                    new PortalRulesMessage(
+                        "$sighsorry_portalrules_server_not_ready"));
             }
 
             return;
@@ -398,9 +399,13 @@ internal static partial class PublicPortalCatalog
         {
             ZNetPeer? sourcePeer = _activePortalSync?.Peer;
             if (remoteIngress &&
-                !IsAuthenticatedRemoteAdminPortalCreation(zdo, sourcePeer))
+                !IsAuthenticatedRemoteAdminCreation(zdo, sourcePeer))
             {
-                PublicPortalServerPolicy.RejectUnverifiedPortal(zdo, sourcePeer);
+                PublicPortalServerPolicy.RejectPortal(
+                    zdo,
+                    sourcePeer,
+                    new PortalRulesMessage(
+                        "$sighsorry_portalrules_admin_portal_placement_requires_admin_debug"));
                 PortalRulesPlugin.PortalRulesLogger.LogWarning(
                     $"Rejected admin portal creation {zdo.m_uid} from a non-admin or unverified peer.");
                 return;
@@ -410,7 +415,11 @@ internal static partial class PublicPortalCatalog
             {
                 if (remoteIngress)
                 {
-                    PublicPortalServerPolicy.RejectUnverifiedPortal(zdo, sourcePeer);
+                    PublicPortalServerPolicy.RejectPortal(
+                        zdo,
+                        sourcePeer,
+                        new PortalRulesMessage(
+                            "$sighsorry_portalrules_admin_portal_unavailable"));
                     PortalRulesPlugin.PortalRulesLogger.LogWarning(
                         $"Rejected admin portal creation {zdo.m_uid} while biome GlobalKey defaults were unavailable.");
                 }
@@ -462,7 +471,14 @@ internal static partial class PublicPortalCatalog
 
             if (!builderResolved)
             {
-                if (remoteIngress || creatorPlayerId != 0L)
+                bool authenticatedRemoteAdminCreatorless =
+                    remoteIngress &&
+                    creatorPlayerId == 0L &&
+                    IsAuthenticatedRemoteAdminCreation(
+                        zdo,
+                        _activePortalSync?.Peer);
+                if (creatorPlayerId != 0L ||
+                    (remoteIngress && !authenticatedRemoteAdminCreatorless))
                 {
                     ZNetPeer? peer = _activePortalSync?.Peer;
                     PublicPortalServerPolicy.RejectUnverifiedPortal(zdo, peer);
@@ -1824,6 +1840,14 @@ internal static partial class PublicPortalCatalog
             storedBuilder = registryBuilder;
         }
 
+        if (!storedBuilder.IsValid &&
+            portal.GetLong(ZDOVars.s_creator, 0L) == 0L)
+        {
+            return CreateCreatorlessSystemPortalAuthority(
+                portal,
+                favoriteId);
+        }
+
         bool builderRequiredMode =
             rawMode == (int)PublicPortalAccessMode.Invite ||
             rawMode == (int)PublicPortalAccessMode.Clan ||
@@ -2019,11 +2043,11 @@ internal static partial class PublicPortalCatalog
                 requiredGlobalKey: ResolveInitialAdminRequiredGlobalKey(portal));
         }
 
-        if (TryCreateServerLocalCreatorlessBlueprintAuthority(
-                portal,
-                out ServerPortalAuthority blueprintAuthority))
+        if (portal.GetLong(ZDOVars.s_creator, 0L) == 0L)
         {
-            return blueprintAuthority;
+            return CreateCreatorlessSystemPortalAuthority(
+                portal,
+                CreateServerFavoriteId());
         }
 
         return new ServerPortalAuthority(
@@ -2037,50 +2061,19 @@ internal static partial class PublicPortalCatalog
             0L);
     }
 
-    private static bool TryCreateServerLocalCreatorlessBlueprintAuthority(
+    private static ServerPortalAuthority CreateCreatorlessSystemPortalAuthority(
         ZDO portal,
-        out ServerPortalAuthority authority)
+        string favoriteId)
     {
-        authority = default;
-        int prefabHash = portal.GetPrefab();
-        // Blueprint systems copy arbitrary ZDO fields. Import an access mode only
-        // from a complete current PortalRules stamp on a ZDO created by this
-        // server session; identity, quota, expiry, and favorite data never cross.
-        if (_activePortalSync != null ||
-            ZDOMan.instance == null ||
-            PublicPortalKinds.IsAdminPortalPrefab(prefabHash) ||
-            portal.GetLong(ZDOVars.s_creator, 0L) != 0L ||
-            portal.m_uid.UserID != ZDOMan.GetSessionID() ||
-            portal.GetInt(PublicPortalData.AuthorityVersionKey, 0) !=
-            PublicPortalData.CurrentAccessAuthorityVersion ||
-            portal.GetInt(PublicPortalData.BuilderAuthorityVersionKey, 0) !=
-            PublicPortalData.CurrentBuilderAuthorityVersion ||
-            portal.GetInt(PublicPortalData.AuthorizedPrefabHashKey, 0) !=
-            prefabHash)
-        {
-            return false;
-        }
-
-        int rawMode = portal.GetInt(PublicPortalData.AccessModeKey, -1);
-        if (rawMode != (int)PublicPortalAccessMode.Public)
-        {
-            return false;
-        }
-
-        PublicPortalAccessMode mode = (PublicPortalAccessMode)rawMode;
-        authority = new ServerPortalAuthority(
-            mode,
+        return new ServerPortalAuthority(
+            PublicPortalAccessMode.Public,
             new PortalOwner("", ""),
             "",
             new PortalBuilder("", ""),
-            prefabHash,
-            CreateServerFavoriteId(),
+            portal.GetPrefab(),
+            favoriteId,
             "",
             0L);
-        PortalRulesPlugin.PortalRulesLogger.LogDebug(
-            $"Restored {mode} access for server-created creatorless blueprint " +
-            $"portal {portal.m_uid}; copied identity and favorite data were discarded.");
-        return true;
     }
 
     private static string ReadInitialFavoriteId(ZDO portal)
@@ -3457,27 +3450,18 @@ internal static partial class PublicPortalCatalog
         return false;
     }
 
-    private static bool IsAuthenticatedRemoteAdminPortalCreation(
+    private static bool IsAuthenticatedRemoteAdminCreation(
         ZDO zdo,
         ZNetPeer? peer)
     {
-        Vector3 portalPosition = zdo.GetPosition();
         return _activePortalSync != null &&
                _activePortalSync.CreatedIds.Contains(zdo.m_uid) &&
                peer != null &&
                peer.IsReady() &&
                zdo.m_uid.UserID == peer.m_uid &&
-               zdo.GetOwner() == peer.m_uid &&
                ZNet.instance != null &&
                PublicPortalData.IsPeerAdmin(ZNet.instance, peer) &&
-               PublicPortalData.TryGetPeerOwner(peer, out _) &&
-               PublicPortalData.TryGetAuthenticatedPeerCharacterPosition(
-                   peer,
-                   out Vector3 playerPosition) &&
-               IsSafePortalPosition(portalPosition) &&
-               TryNormalizePortalRotation(zdo.GetRotation(), out _) &&
-               Vector3.Distance(playerPosition, portalPosition) <=
-               MaximumAdminPortalPlacementDistance;
+               PublicPortalData.TryGetPeerOwner(peer, out _);
     }
 
     private static ServerPortalAuthority SetServerAuthority(

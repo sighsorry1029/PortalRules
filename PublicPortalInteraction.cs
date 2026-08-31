@@ -138,6 +138,36 @@ internal static class PublicPortalInteraction
             return;
         }
 
+        if (!PublicPortalData.TryGetPeerOwner(peer, out PortalOwner requester))
+        {
+            SendAccessModeResult(
+                rpc,
+                portalId,
+                success: false,
+                PublicPortalAccessMode.Personal,
+                new PortalRulesMessage(
+                    "$sighsorry_portalrules_platform_identity_unverified"));
+            return;
+        }
+
+        // Authenticate the active character before consuming the user-facing
+        // access-mode cooldown. A transient dedicated-server scene miss must
+        // report its real cause instead of turning an immediate retry into a
+        // misleading rate-limit failure.
+        if (!PublicPortalData.TryGetAuthenticatedPeerCharacterPosition(
+                peer,
+                out _))
+        {
+            SendAccessModeResult(
+                rpc,
+                portalId,
+                success: false,
+                PublicPortalAccessMode.Personal,
+                new PortalRulesMessage(
+                    "$sighsorry_portalrules_active_character_unverified"));
+            return;
+        }
+
         float now = Time.realtimeSinceStartup;
         if (LastAccessModeRequestAt.TryGetValue(rpc, out float lastRequestAt) &&
             now - lastRequestAt < AccessModeRequestCooldownSeconds)
@@ -153,18 +183,6 @@ internal static class PublicPortalInteraction
         }
 
         LastAccessModeRequestAt[rpc] = now;
-        if (!PublicPortalData.TryGetPeerOwner(peer, out PortalOwner requester))
-        {
-            SendAccessModeResult(
-                rpc,
-                portalId,
-                success: false,
-                PublicPortalAccessMode.Personal,
-                new PortalRulesMessage(
-                    "$sighsorry_portalrules_platform_identity_unverified"));
-            return;
-        }
-
         bool requesterIsAdmin = PublicPortalData.IsPeerAdmin(znet, peer);
         bool success = TryApplyAccessModeChange(
             portalId,

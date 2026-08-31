@@ -337,6 +337,18 @@ internal static class PublicPortalServerPolicy
 
     internal static void RejectUnverifiedPortal(ZDO zdo, ZNetPeer? sourcePeer)
     {
+        RejectPortal(
+            zdo,
+            sourcePeer,
+            new PortalRulesMessage(
+                "$sighsorry_portalrules_portal_placement_account_unverified"));
+    }
+
+    internal static void RejectPortal(
+        ZDO zdo,
+        ZNetPeer? sourcePeer,
+        PortalRulesMessage message)
+    {
         if (zdo == null)
         {
             return;
@@ -347,12 +359,9 @@ internal static class PublicPortalServerPolicy
             QueueRemoval(zdo.m_uid);
         }
 
-        SendPolicyMessage(
-            sourcePeer,
-            new PortalRulesMessage(
-                "$sighsorry_portalrules_portal_placement_account_unverified"));
+        SendPolicyMessage(sourcePeer, message);
         PortalRulesPlugin.PortalRulesLogger.LogWarning(
-            $"Rejected unverified portal creation {zdo.m_uid}.");
+            $"Rejected portal creation {zdo.m_uid} ({message.Token}).");
     }
 
     internal static bool QueueAdminPortalRemoval(ZDO zdo)

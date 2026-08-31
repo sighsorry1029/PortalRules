@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Fixed dedicated-server character verification blocking portal use and access-mode changes.
+- Fixed authenticated server admins being unable to place Admin portals on dedicated servers.
+- Added safe Public handling for creatorless server and location portals.
+
 ## 1.0.1
 
 - Fixed portal catalog updates occasionally being missed after portal changes.
