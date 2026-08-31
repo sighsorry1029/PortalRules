@@ -1,0 +1,268 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')"/>
+    <Import Project="environment.props" Condition="Exists('environment.props')"/>
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <ProjectGuid>{4358610B-F3F4-4843-B7AF-98B7BC60DCDE}</ProjectGuid>
+        <OutputType>Library</OutputType>
+        <AppDesignerFolder>Properties</AppDesignerFolder>
+        <RootNamespace>PortalRules</RootNamespace>
+        <AssemblyName>PortalRules</AssemblyName>
+        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+        <FileAlignment>512</FileAlignment>
+        <LangVersion>10.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <DeployToValheim Condition="'$(DeployToValheim)' == ''">false</DeployToValheim>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>full</DebugType>
+        <Optimize>false</Optimize>
+        <OutputPath>bin\Debug\</OutputPath>
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <DebugType>pdbonly</DebugType>
+        <Optimize>true</Optimize>
+        <OutputPath>bin\Release\</OutputPath>
+        <DefineConstants>TRACE</DefineConstants>
+        <ErrorReport>prompt</ErrorReport>
+        <WarningLevel>4</WarningLevel>
+    </PropertyGroup>
+    <Choose>
+        <When Condition="($(OS) == 'Unix' OR $(OS) == 'OSX') AND $(GamePath) == ''">
+            <PropertyGroup>
+                <GamePath Condition="!Exists('$(GamePath)')">$(HOME)/.steam/steam/steamapps/common/Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">$(HOME)/Library/Application Support/Steam/steamapps/common/Valheim/Contents/MacOS</GamePath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)')">$(GamePath)/unstripped_corelib</CorlibPath>
+            </PropertyGroup>
+        </When>
+        <When Condition="($(OS) == 'Windows_NT') AND $(GamePath) == ''">
+            <PropertyGroup>
+                <GamePath Condition="!Exists('$(GamePath)')">$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 892970', 'InstallLocation', null, RegistryView.Registry64, RegistryView.Registry32))</GamePath>
+                <_SteamLibraryPath>$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\SOFTWARE\Valve\Steam', 'SteamPath', null, RegistryView.Registry32))</_SteamLibraryPath>
+                <GamePath Condition="!Exists('$(GamePath)') AND '$(_SteamLibraryPath)' != ''">$(_SteamLibraryPath)\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)') AND Exists('$(ValheimGamePath)')">$(ValheimGamePath)</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files\Steam\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files (x86)\Steam\steamapps\common\Valheim</GamePath>
+                <GamePath Condition="!Exists('$(GamePath)')">D:\SteamLibrary\steamapps\common\Valheim</GamePath>
+                <BepInExPath Condition="!Exists('$(BepInExPath)')AND Exists('$(GamePath)')">$(GamePath)\BepInEx</BepInExPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
+                <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\unstripped_corlib</CorlibPath>
+            </PropertyGroup>
+        </When>
+    </Choose>
+    <ItemGroup>
+        <Reference Include="0Harmony">
+            <HintPath>$(BepInExPath)\core\0Harmony.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_guiutils">
+            <HintPath>$(CorlibPath)\assembly_guiutils.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_utils">
+            <HintPath>$(CorlibPath)\assembly_utils.dll</HintPath>
+        </Reference>
+        <Reference Include="assembly_valheim">
+            <HintPath>$(CorlibPath)\assembly_valheim.dll</HintPath>
+        </Reference>
+        <Reference Include="BepInEx">
+            <HintPath>$(BepInExPath)\core\BepInEx.dll</HintPath>
+        </Reference>
+        <Reference Include="Jotunn">
+            <HintPath>Libs\Jotunn.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="ServerSync">
+            <HintPath>Libs\ServerSync.dll</HintPath>
+        </Reference>
+        <Reference Include="Splatform">
+            <HintPath>$(CorlibPath)\Splatform.dll</HintPath>
+        </Reference>
+        <Reference Include="System"/>
+        <Reference Include="System.Core"/>
+        <Reference Include="System.Data"/>
+        <Reference Include="System.Xml"/>
+        <Reference Include="UnityEngine">
+            <HintPath>$(CorlibPath)\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>$(CorlibPath)\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AudioModule">
+            <HintPath>$(CorlibPath)\UnityEngine.AudioModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(CorlibPath)\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>$(CorlibPath)\UnityEngine.IMGUIModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(CorlibPath)\UnityEngine.InputLegacyModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ParticleSystemModule">
+            <HintPath>$(CorlibPath)\UnityEngine.ParticleSystemModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(CorlibPath)\UnityEngine.PhysicsModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>$(CorlibPath)\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>$(CorlibPath)\UnityEngine.UI.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath>$(GamePath)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+        </Reference>
+        <!-- This legacy (non-SDK) project does not pass PackageReference compile assets
+             to ResolveAssemblyReference, so keep the package as the version source and
+             bridge its restored net47 assembly explicitly. -->
+        <Reference Include="YamlDotNet">
+            <HintPath>$(NuGetPackageRoot)yamldotnet\16.3.0\lib\net47\YamlDotNet.dll</HintPath>
+            <Private>True</Private>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="AdminPortalBiomeDefaults.cs"/>
+        <Compile Include="AdminPortalPrefabManager.cs"/>
+        <Compile Include="AdminPortalOperations.cs"/>
+        <Compile Include="ClanPortalAccess.cs"/>
+        <Compile Include="InviteTravelCooldownStore.cs"/>
+        <Compile Include="Plugin.cs"/>
+        <Compile Include="PortalCoinWallet.cs"/>
+        <Compile Include="PortalAccountStore.cs"/>
+        <Compile Include="PortalRulesLocalization.cs"/>
+        <Compile Include="PortalRulesFileIO.cs"/>
+        <Compile Include="PortalRulesMessage.cs"/>
+        <Compile Include="PublicPortalConfig.cs"/>
+        <Compile Include="PublicPortalConnectedHud.cs"/>
+        <Compile Include="PublicPortalData.cs"/>
+        <Compile Include="PublicPortalCatalog.cs"/>
+        <Compile Include="PublicPortalCatalog.Network.cs"/>
+        <Compile Include="PublicPortalServerPolicy.cs"/>
+        <Compile Include="PublicPortalAccess.cs"/>
+        <Compile Include="PublicPortalInteraction.cs"/>
+        <Compile Include="PublicPortalKinds.cs"/>
+        <Compile Include="PublicPortalMap.cs"/>
+        <Compile Include="PublicPortalMapController.cs"/>
+        <Compile Include="RequiredGlobalKeyAccess.cs"/>
+        <Compile Include="PublicPortalModeChangeEffects.cs"/>
+        <Compile Include="PublicPortalPinController.cs"/>
+        <Compile Include="PublicPortalPinTypeRegistrar.cs"/>
+        <Compile Include="PublicPortalTaggedConnections.cs"/>
+        <Compile Include="PublicPortalFavoritePanel.cs"/>
+        <Compile Include="PublicPortalTravelCost.cs"/>
+        <Compile Include="PublicPortalTeleportService.cs"/>
+        <Compile Include="PublicPortalTeleportService.Transactions.cs"/>
+        <Compile Include="Properties\AssemblyInfo.cs"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Content Include=".gitignore"/>
+        <Content Include="environment.props" Condition="Exists('environment.props')"/>
+        <Content Include="ILRepack.targets"/>
+        <Content Include="Libs\ServerSync.dll">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="LICENSE"/>
+        <Content Include="README.md"/>
+        <EmbeddedResource Include="THIRD-PARTY-NOTICES.txt">
+            <LogicalName>PortalRules.THIRD-PARTY-NOTICES.txt</LogicalName>
+        </EmbeddedResource>
+        <Content Include="Thunderstore\CHANGELOG.md"/>
+        <Content Include="Thunderstore\icon.png"/>
+        <Content Include="Thunderstore\manifest.json"/>
+        <EmbeddedResource Include="translations\English.yml">
+            <LogicalName>PortalRules.translations.English.yml</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="translations\Korean.yml">
+            <LogicalName>PortalRules.translations.Korean.yml</LogicalName>
+        </EmbeddedResource>
+        <Content Include="UpdateManifest.ps1"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="App.config"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.44.1">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    </ItemGroup>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
+    <Target Name="GetAssemblyVersion" AfterTargets="ILRepacker">
+        <GetAssemblyIdentity AssemblyFiles="$(TargetPath)">
+            <Output TaskParameter="Assemblies" ItemName="Targets"/>
+        </GetAssemblyIdentity>
+        <ItemGroup>
+            <AssemblyVersions Include="@(Targets->'%(Version)')"/>
+        </ItemGroup>
+        <Error Text="Failed to get Assembly Version." Condition="'%(AssemblyVersions.Identity)' == ''"/>
+        <PropertyGroup>
+            <AssemblyVersion>%(AssemblyVersions.Identity)</AssemblyVersion>
+            <Major>$(AssemblyVersion.Split('.')[0])</Major>
+            <Minor>$(AssemblyVersion.Split('.')[1])</Minor>
+            <Patch>$(AssemblyVersion.Split('.')[2])</Patch>
+            <PackageName>$(AssemblyName)_v$(Major).$(Minor).$(Patch)</PackageName>
+            <PackageVersion>$(Major).$(Minor).$(Patch)</PackageVersion>
+            <ThunderstorePackageDir>$(IntermediateOutputPath)PortalRulesPackage\Thunderstore\$(PackageName)</ThunderstorePackageDir>
+            <NexusPackageDir>$(IntermediateOutputPath)PortalRulesPackage\Nexus\$(PackageName)</NexusPackageDir>
+        </PropertyGroup>
+    </Target>
+    <Target Name="CopyOutputDLL" AfterTargets="GetAssemblyVersion" Condition="'$(DeployToValheim)' == 'true'">
+        <Error Text="DLL not found in target directory." Condition="!Exists('$(TargetDir)$(AssemblyName).dll')"/>
+        <Error Text="CopyOutputDLLPath must point to an existing directory when DeployToValheim is true." Condition="'$(CopyOutputDLLPath)' == '' Or !Exists('$(CopyOutputDLLPath)')"/>
+        <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(CopyOutputDLLPath)" OverwriteReadOnlyFiles="true"/>
+        <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(CopyOutputDLLPath2)" OverwriteReadOnlyFiles="true" Condition="Exists('$(CopyOutputDLLPath2)')"/>
+        <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(CopyOutputDLLPath3)" OverwriteReadOnlyFiles="true" Condition="Exists('$(CopyOutputDLLPath3)')"/>
+    </Target>
+    <Target Name="UpdateManifestVersion" AfterTargets="GetAssemblyVersion" Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <Error Text="manifest.json not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)Thunderstore\manifest.json')"/>
+        <ItemGroup>
+            <ManifestFile Include="$(ProjectDir)Thunderstore\manifest.json"/>
+        </ItemGroup>
+        <Message Text="ManifestFile is @(ManifestFile)"/>
+        <Message Text="Updating version number in Thunderstore\manifest.json" Condition="Exists(@(ManifestFile))"/>
+        <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -Command &quot;&amp; { &amp; '$(ProjectDir)UpdateManifest.ps1' -manifestFile '@(ManifestFile)' -versionString '$(PackageVersion)' }&quot;" Condition="'$(OS)' == 'Windows_NT'"/>
+        <Exec Command="pwsh -NoProfile -File &quot;$(ProjectDir)UpdateManifest.ps1&quot; -manifestFile &quot;@(ManifestFile)&quot; -versionString &quot;$(PackageVersion)&quot;" Condition="'$(OS)' != 'Windows_NT'"/>
+    </Target>
+    <Target Name="MakeThunderstorePackage" AfterTargets="UpdateManifestVersion" Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <Error Text="PortalRules.dll not found in the Release output." Condition="!Exists('$(TargetDir)$(AssemblyName).dll')"/>
+        <Error Text="root README.md not found." Condition="!Exists('$(ProjectDir)README.md')"/>
+        <Error Text="CHANGELOG.md not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)Thunderstore\CHANGELOG.md')"/>
+        <Error Text="manifest.json not found in Thunderstore directory." Condition="!Exists('$(ProjectDir)\Thunderstore\manifest.json')"/>
+        <Error Text="icon.png not found in Thunderstore directory. Please note that Thunderstore requires this image to be 256x256 in dimension" Condition="!Exists('$(ProjectDir)\Thunderstore\icon.png')"/>
+        <Error Text="translations\English.yml not found." Condition="!Exists('$(ProjectDir)translations\English.yml')"/>
+        <ItemGroup>
+            <ThunderstorePackageFiles Include="$(TargetDir)$(AssemblyName).dll"/>
+            <ThunderstorePackageFiles Include="$(ProjectDir)README.md"/>
+            <ThunderstorePackageFiles Include="$(ProjectDir)Thunderstore\CHANGELOG.md"/>
+            <ThunderstorePackageFiles Include="$(ProjectDir)Thunderstore\manifest.json"/>
+            <ThunderstorePackageFiles Include="$(ProjectDir)Thunderstore\icon.png"/>
+        </ItemGroup>
+        <RemoveDir Directories="$(ThunderstorePackageDir)" Condition="Exists('$(ThunderstorePackageDir)')"/>
+        <MakeDir Directories="$(ThunderstorePackageDir)"/>
+        <Copy SourceFiles="@(ThunderstorePackageFiles)" DestinationFolder="$(ThunderstorePackageDir)"/>
+        <Copy SourceFiles="$(ProjectDir)translations\English.yml" DestinationFiles="$(ThunderstorePackageDir)\PortalRules.English.yml"/>
+        <ZipDirectory SourceDirectory="$(ThunderstorePackageDir)" DestinationFile="$(ProjectDir)Thunderstore\$(PackageName).zip" Overwrite="true"/>
+        <RemoveDir Directories="$(ThunderstorePackageDir)"/>
+    </Target>
+    <Target Name="MakeNexusPackage" AfterTargets="MakeThunderstorePackage" Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <Error Text="PortalRules.dll not found in the Release output." Condition="!Exists('$(TargetDir)$(AssemblyName).dll')"/>
+        <MakeDir Directories="$(ProjectDir)\Nexus"/>
+        <RemoveDir Directories="$(NexusPackageDir)" Condition="Exists('$(NexusPackageDir)')"/>
+        <MakeDir Directories="$(NexusPackageDir)"/>
+        <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(NexusPackageDir)"/>
+        <ZipDirectory SourceDirectory="$(NexusPackageDir)" DestinationFile="$(ProjectDir)Nexus\$(PackageName).zip" Overwrite="true"/>
+        <RemoveDir Directories="$(NexusPackageDir)"/>
+    </Target>
+
+</Project>

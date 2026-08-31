@@ -1,0 +1,33 @@
+﻿{
+  "author": "sighsorry",
+  "classifications": [
+    "ServerSync Mod"
+  ],
+  "name": "PortalRules",
+  "identity": "PortalRules",
+  "shortName": "portalrules",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "PortalRules",
+  "preferNameDirectory": "true",
+  "symbols": {
+    "AuthorName": {
+      "type": "parameter",
+      "description": "The name of the person that you want to call the author of the mod.",
+      "datatype": "string",
+      "defaultValue": "sighsorry",
+      "replaces": "sighsorry"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [ ".git/**", ".idea/**", ".vs/**", "obj/**", "bin/**", "publicportal.sln", "publicportal.sln.DotSettings.user" ]
+        }
+      ]
+    }
+  ]
+}
