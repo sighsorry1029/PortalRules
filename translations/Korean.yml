@@ -37,6 +37,7 @@ sighsorry_portalrules_admin_tag_updated: "관리자 포탈 태그가 변경되�
 sighsorry_portalrules_admin_wood_portal_name: "관리자 나무 포탈"
 sighsorry_portalrules_all_items: "모든 아이템"
 sighsorry_portalrules_all_items_bulleted: "· 모든 아이템"
+sighsorry_portalrules_hover_all_items_teleportable: "모든 아이템 순간이동 가능"
 sighsorry_portalrules_catalog_update_failed: "서버가 포탈 목록을 갱신하지 못했습니다."
 sighsorry_portalrules_coins_quantity: "코인 x{0}"
 sighsorry_portalrules_destination_not_managed_portal: "요청한 대상은 관리되는 포탈이 아닙니다."

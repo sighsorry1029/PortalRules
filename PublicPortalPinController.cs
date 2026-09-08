@@ -15,7 +15,6 @@ internal sealed class PublicPortalPinController
     private const float PortalClickRadius = 96f;
     private const float TravelBadgeRefreshIntervalSeconds = 0.2f;
     private const float PinDecorationRefreshIntervalSeconds = 0.2f;
-    private const float NoTeleportIconSize = 21f;
     private static readonly Color UnaffordableColor =
         new(1f, 0.42f, 0.32f);
     private static readonly Color CooldownIconColor =
@@ -64,13 +63,11 @@ internal sealed class PublicPortalPinController
         public readonly RectTransform CoinIconRect;
         public readonly Text CostText;
         public readonly RectTransform CostTextRect;
-        public readonly Image NoTeleportIcon;
 
         public TravelBadge(
             GameObject root,
             Image coinIcon,
-            Text costText,
-            Image noTeleportIcon)
+            Text costText)
         {
             Root = root;
             RootRect = (RectTransform)root.transform;
@@ -78,7 +75,6 @@ internal sealed class PublicPortalPinController
             CoinIconRect = (RectTransform)coinIcon.transform;
             CostText = costText;
             CostTextRect = (RectTransform)costText.transform;
-            NoTeleportIcon = noTeleportIcon;
         }
     }
 
@@ -183,19 +179,13 @@ internal sealed class PublicPortalPinController
 
     public void UpdateTravelBadges(
         bool isSelecting,
-        PublicPortalCatalogEntry? sourcePortal,
-        bool allowsAllItems)
+        PublicPortalCatalogEntry? sourcePortal)
     {
         UpdatePinDecorations();
 
-        bool showNoTeleport =
-            !allowsAllItems &&
-            Player.m_localPlayer != null &&
-            !Player.m_localPlayer.IsTeleportable();
-
         if (!isSelecting ||
             !sourcePortal.HasValue ||
-            (!PublicPortalTravelCost.IsEnabled && !showNoTeleport))
+            !PublicPortalTravelCost.IsEnabled)
         {
             HideTravelBadges();
             _nextTravelBadgeRefreshAt = -1f;
@@ -212,12 +202,8 @@ internal sealed class PublicPortalPinController
         _nextTravelBadgeRefreshAt =
             now + TravelBadgeRefreshIntervalSeconds;
 
-        int localCoinCount = PublicPortalTravelCost.IsEnabled
-            ? PortalCoinWallet.GetLocalCoinCount()
-            : 0;
-        Sprite? coinIcon = PublicPortalTravelCost.IsEnabled
-            ? PublicPortalTravelCost.GetCoinIcon()
-            : null;
+        int localCoinCount = PortalCoinWallet.GetLocalCoinCount();
+        Sprite? coinIcon = PublicPortalTravelCost.GetCoinIcon();
         foreach (KeyValuePair<Minimap.PinData, PublicPortalCatalogEntry> pair in _activePins)
         {
             if (pair.Value.Id == sourcePortal.Value.Id ||
@@ -233,7 +219,7 @@ internal sealed class PublicPortalPinController
             int travelCost = PublicPortalTravelCost.CalculateCost(
                 sourcePortal.Value,
                 pair.Value);
-            if (travelCost <= 0 && !showNoTeleport)
+            if (travelCost <= 0)
             {
                 SetTravelBadgeVisible(pair.Key, visible: false);
                 continue;
@@ -248,7 +234,6 @@ internal sealed class PublicPortalPinController
             UpdateTravelBadge(
                 badge,
                 travelCost,
-                showNoTeleport,
                 localCoinCount,
                 coinIcon);
             if (!badge.Root.activeSelf)
@@ -609,27 +594,7 @@ internal sealed class PublicPortalPinController
         count.verticalOverflow = VerticalWrapMode.Truncate;
         count.raycastTarget = false;
 
-        GameObject noTeleportObject = new(
-            "NoTeleport",
-            typeof(RectTransform),
-            typeof(Image));
-        noTeleportObject.transform.SetParent(badge.transform, false);
-        RectTransform noTeleportRect =
-            (RectTransform)noTeleportObject.transform;
-        noTeleportRect.anchorMin = new Vector2(0f, 0.5f);
-        noTeleportRect.anchorMax = new Vector2(0f, 0.5f);
-        noTeleportRect.pivot = new Vector2(1f, 0f);
-        noTeleportRect.anchoredPosition = new Vector2(-4f, 0f);
-        noTeleportRect.sizeDelta = new Vector2(
-            NoTeleportIconSize,
-            NoTeleportIconSize);
-
-        Image noTeleport = noTeleportObject.GetComponent<Image>();
-        noTeleport.preserveAspect = true;
-        noTeleport.raycastTarget = false;
-        noTeleportObject.SetActive(false);
-
-        TravelBadge travelBadge = new(badge, icon, count, noTeleport);
+        TravelBadge travelBadge = new(badge, icon, count);
         _travelBadges[pin] = travelBadge;
         return travelBadge;
     }
@@ -637,7 +602,6 @@ internal sealed class PublicPortalPinController
     private static void UpdateTravelBadge(
         TravelBadge badge,
         int travelCost,
-        bool showNoTeleport,
         int localCoinCount,
         Sprite? sharedCoinIcon)
     {
@@ -671,23 +635,6 @@ internal sealed class PublicPortalPinController
             float costWidth = Mathf.Ceil(badge.CostText.preferredWidth) + 2f;
             SetLeftAlignedRect(badge.CostTextRect, cursor, costWidth);
             cursor += costWidth;
-        }
-
-        Sprite noTeleportSprite = null!;
-        Color noTeleportColor = Color.white;
-        Material? noTeleportMaterial = null;
-        bool hasNoTeleportVisual =
-            showNoTeleport &&
-            PublicPortalTravelCost.TryGetNoTeleportVisual(
-                out noTeleportSprite,
-                out noTeleportColor,
-                out noTeleportMaterial);
-        badge.NoTeleportIcon.gameObject.SetActive(hasNoTeleportVisual);
-        if (hasNoTeleportVisual)
-        {
-            badge.NoTeleportIcon.sprite = noTeleportSprite;
-            badge.NoTeleportIcon.color = noTeleportColor;
-            badge.NoTeleportIcon.material = noTeleportMaterial;
         }
 
         badge.RootRect.sizeDelta = new Vector2(cursor, 20f);

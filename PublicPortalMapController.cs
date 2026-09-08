@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Text;
 using BepInEx.Configuration;
 using HarmonyLib;
 using Splatform;
@@ -16,7 +16,6 @@ internal sealed class PublicPortalMapController
     private const string AvailablePortalsHintName = "PortalRulesAvailablePortals";
     private const string AddPinHintName = "AddPin";
     private const string HintMainKeyColor = "#FFA500";
-    private const float FavoriteFareStateCheckIntervalSeconds = 0.2f;
 
     private delegate Vector3 ScreenToWorldPointDelegate(Minimap minimap, Vector3 screenPoint);
     private delegate bool TakeInputDelegate(PlayerController controller, bool look);
@@ -42,56 +41,6 @@ internal sealed class PublicPortalMapController
     private Minimap? _availablePortalsHintOwner;
     private GameObject? _availablePortalsHint;
     private TMP_Text? _availablePortalsHintLabel;
-    private float _nextFavoriteFareStateCheckAt = -1f;
-    private FavoriteFareState? _favoriteFareState;
-
-    private readonly struct FavoriteFareState : IEquatable<FavoriteFareState>
-    {
-        private readonly PublicPortalTravelCostScope _scope;
-        private readonly int _baseCoinCost;
-        private readonly float _includedDistanceMeters;
-        private readonly float _coinsPerKilometer;
-        private readonly int _localCoinCount;
-        private readonly bool _itemsBlocked;
-        private readonly bool _noTeleportVisualAvailable;
-        private readonly string _inviteCooldownState;
-
-        internal FavoriteFareState(
-            PublicPortalTravelCostScope scope,
-            int baseCoinCost,
-            float includedDistanceMeters,
-            float coinsPerKilometer,
-            int localCoinCount,
-            bool itemsBlocked,
-            bool noTeleportVisualAvailable,
-            string inviteCooldownState)
-        {
-            _scope = scope;
-            _baseCoinCost = baseCoinCost;
-            _includedDistanceMeters = includedDistanceMeters;
-            _coinsPerKilometer = coinsPerKilometer;
-            _localCoinCount = localCoinCount;
-            _itemsBlocked = itemsBlocked;
-            _noTeleportVisualAvailable = noTeleportVisualAvailable;
-            _inviteCooldownState = inviteCooldownState;
-        }
-
-        public bool Equals(FavoriteFareState other)
-        {
-            return _scope == other._scope &&
-                   _baseCoinCost == other._baseCoinCost &&
-                   _includedDistanceMeters.Equals(other._includedDistanceMeters) &&
-                   _coinsPerKilometer.Equals(other._coinsPerKilometer) &&
-                   _localCoinCount == other._localCoinCount &&
-                   _itemsBlocked == other._itemsBlocked &&
-                   _noTeleportVisualAvailable ==
-                   other._noTeleportVisualAvailable &&
-                   string.Equals(
-                       _inviteCooldownState,
-                       other._inviteCooldownState,
-                       StringComparison.Ordinal);
-        }
-    }
 
     private PublicPortalMapController()
     {
@@ -122,6 +71,12 @@ internal sealed class PublicPortalMapController
         }
 
         PublicPortalTeleportService.CancelPending();
+        if (!PublicPortalTeleportService.CanTeleportWithItems(sourcePortal.m_allowAllItems))
+        {
+            Player.m_localPlayer.Message(MessageHud.MessageType.Center, "$msg_noteleport");
+            return;
+        }
+
         ZDOID sourcePortalId = sourceZdo.m_uid;
         PublicPortalTeleportService.AuthorizeMapOpen(
             sourcePortalId,
@@ -151,6 +106,13 @@ internal sealed class PublicPortalMapController
         ZDO? sourceZdo = PublicPortalKinds.GetPortalZdo(sourcePortal);
         if (sourceZdo == null || sourceZdo.m_uid != authorizedSourcePortalId)
         {
+            return;
+        }
+
+        // Inventory or the source's item rule can change while approval is in flight.
+        if (!PublicPortalTeleportService.CanTeleportWithItems(sourcePortal.m_allowAllItems))
+        {
+            Player.m_localPlayer.Message(MessageHud.MessageType.Center, "$msg_noteleport");
             return;
         }
 
@@ -212,9 +174,11 @@ internal sealed class PublicPortalMapController
         UpdateAvailablePortalsHint(minimap);
         _pins.UpdateTravelBadges(
             IsSelecting,
+            _sourcePortal);
+        _favorites.Tick(
+            IsSelecting,
             _sourcePortal,
-            AllowsAllItemsForCurrentMapTrip());
-        RefreshFavoriteFareStateIfChanged();
+            _pins.Portals);
 
         if (!IsSelecting ||
             PublicPortalConfig.AutoCloseGraceSeconds.Value <= 0f ||
@@ -335,8 +299,6 @@ internal sealed class PublicPortalMapController
         _sourceTriggerCollider = null;
         _playerCollider = null;
         _lostSourceAreaAt = -1f;
-        _favoriteFareState = null;
-        _nextFavoriteFareStateCheckAt = -1f;
         SetAccessiblePortalPinsVisible(visible: false, showMessage: false);
     }
 
@@ -365,14 +327,10 @@ internal sealed class PublicPortalMapController
     {
         _favorites.Refresh(
             _sourcePortal,
-            ItemsBlockedForCurrentMapTrip(),
             _pins.Portals,
             TryTeleportTo,
             RemoveFavorite,
             FocusFavorite);
-        _favoriteFareState = _favorites.IsCollapsed
-            ? null
-            : CaptureFavoriteFareState();
     }
 
     internal void RefreshFavoritePanelFromPreference()
@@ -381,88 +339,6 @@ internal sealed class PublicPortalMapController
         {
             RefreshFavorites();
         }
-    }
-
-    private void RefreshFavoriteFareStateIfChanged()
-    {
-        if (!IsSelecting ||
-            !_favorites.IsVisible ||
-            _favorites.IsCollapsed)
-        {
-            _favoriteFareState = null;
-            _nextFavoriteFareStateCheckAt = -1f;
-            return;
-        }
-
-        float now = Time.unscaledTime;
-        if (_nextFavoriteFareStateCheckAt >= 0f &&
-            now < _nextFavoriteFareStateCheckAt)
-        {
-            return;
-        }
-
-        _nextFavoriteFareStateCheckAt =
-            now + FavoriteFareStateCheckIntervalSeconds;
-        FavoriteFareState currentState = CaptureFavoriteFareState();
-        if (!_favoriteFareState.HasValue)
-        {
-            _favoriteFareState = currentState;
-            return;
-        }
-
-        if (_favoriteFareState.Value.Equals(currentState))
-        {
-            return;
-        }
-
-        RefreshFavorites();
-    }
-
-    private FavoriteFareState CaptureFavoriteFareState()
-    {
-        bool itemsBlocked = ItemsBlockedForCurrentMapTrip();
-        bool noTeleportVisualAvailable =
-            !itemsBlocked ||
-            PublicPortalTravelCost.TryGetNoTeleportVisual(
-                out _,
-                out _,
-                out _);
-        return new FavoriteFareState(
-            PublicPortalConfig.TravelCostScope.Value,
-            PublicPortalConfig.BaseCoinCost.Value,
-            PublicPortalConfig.BaseFareIncludedDistanceMeters.Value,
-            PublicPortalConfig.CoinsPerKilometer.Value,
-            PublicPortalTravelCost.IsEnabled
-                ? PortalCoinWallet.GetLocalCoinCount()
-                : 0,
-            itemsBlocked,
-            noTeleportVisualAvailable,
-            GetFavoriteInviteCooldownDisplayState());
-    }
-
-    private string GetFavoriteInviteCooldownDisplayState()
-    {
-        List<string> favoriteIds = PublicPortalData.ReadFavorites();
-        return string.Join(
-            "|",
-            _pins.Portals
-                .Where(portal =>
-                    favoriteIds.Contains(portal.FavoriteId) &&
-                    portal.AccessMode == PublicPortalAccessMode.Invite)
-                .OrderBy(
-                    portal => portal.FavoriteId,
-                    StringComparer.Ordinal)
-                .Select(portal =>
-                {
-                    return InviteTravelCooldownStore
-                        .TryGetInviteArrivalCooldownRemaining(
-                            portal,
-                            out long remainingSeconds)
-                        ? $"{portal.FavoriteId}:" +
-                          InviteTravelCooldownStore.FormatRemaining(
-                              remainingSeconds)
-                        : $"{portal.FavoriteId}:-";
-                }));
     }
 
     private void TryTeleportTo(PublicPortalCatalogEntry portal)
@@ -491,14 +367,6 @@ internal sealed class PublicPortalMapController
     private bool AllowsAllItemsForCurrentMapTrip()
     {
         return IsSelecting && _sourcePortal?.AllowsAllItems == true;
-    }
-
-    private bool ItemsBlockedForCurrentMapTrip()
-    {
-        return IsSelecting &&
-               !AllowsAllItemsForCurrentMapTrip() &&
-               Player.m_localPlayer != null &&
-               !Player.m_localPlayer.IsTeleportable();
     }
 
     private void ToggleAccessiblePortalPins()
@@ -837,13 +705,19 @@ internal sealed class PublicPortalMapController
 
     private static string FormatHintShortcut(KeyboardShortcut shortcut)
     {
-        List<string> parts = shortcut.Modifiers
-            .Select(FormatHintKey)
-            .ToList();
-        parts.Add(
-            $"<color={HintMainKeyColor}>" +
-            $"{FormatHintKey(shortcut.MainKey)}</color>");
-        return string.Join(" + ", parts);
+        StringBuilder text = new();
+        foreach (KeyCode modifier in shortcut.Modifiers)
+        {
+            text.Append(FormatHintKey(modifier));
+            text.Append(" + ");
+        }
+
+        text.Append("<color=");
+        text.Append(HintMainKeyColor);
+        text.Append('>');
+        text.Append(FormatHintKey(shortcut.MainKey));
+        text.Append("</color>");
+        return text.ToString();
     }
 
     private static string FormatHintKey(KeyCode key)

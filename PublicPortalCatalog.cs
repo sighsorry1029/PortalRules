@@ -374,12 +374,6 @@ internal static partial class PublicPortalCatalog
             return;
         }
 
-        if (!PublicPortalKinds.IsHandledPortal(zdo) &&
-            !PublicPortalServerPolicy.IsCountedPortalPrefab(zdo.GetPrefab()))
-        {
-            return;
-        }
-
         bool remoteIngress = _activePortalSync != null;
         if (!_authorityBackfilled)
         {
@@ -441,7 +435,7 @@ internal static partial class PublicPortalCatalog
                     favoriteId: CreateServerFavoriteId(),
                     requiredGlobalKey: ResolveInitialAdminRequiredGlobalKey(zdo)),
                 forceSend: true);
-            MarkServerCatalogDirty(zdo);
+            MarkServerCatalogDirty();
             return;
         }
 
@@ -524,7 +518,7 @@ internal static partial class PublicPortalCatalog
         }
 
         SetAndPersistServerAuthority(zdo, authority, forceSend: true);
-        MarkServerCatalogDirty(zdo);
+        MarkServerCatalogDirty();
     }
 
     public static PortalSyncContext? BeginPortalSync(ZRpc rpc)
@@ -1446,17 +1440,6 @@ internal static partial class PublicPortalCatalog
         BroadcastSnapshot();
     }
 
-    private static void MarkServerCatalogDirty(ZDO portal)
-    {
-        if (!PublicPortalKinds.IsHandledPortal(portal) &&
-            !PublicPortalServerPolicy.IsCountedPortalPrefab(portal.GetPrefab()))
-        {
-            return;
-        }
-
-        MarkServerCatalogDirty();
-    }
-
     private static void MarkServerCatalogDirty()
     {
         _serverCatalogDirty = true;
@@ -1648,13 +1631,6 @@ internal static partial class PublicPortalCatalog
             }
             else
             {
-                bool isNewHandledPortal = PublicPortalKinds.IsHandledPortal(portal);
-                if (!isNewHandledPortal &&
-                    !PublicPortalServerPolicy.IsCountedPortalPrefab(portal.GetPrefab()))
-                {
-                    continue;
-                }
-
                 authority = initialBackfill || InitialWorldPortalIds.Contains(portal.m_uid)
                     ? ReadInitialAuthority(portal)
                     : CreateAuthorityForNewPortal(portal);
@@ -1696,11 +1672,6 @@ internal static partial class PublicPortalCatalog
                 PortalRulesPlugin.PortalRulesLogger.LogDebug(
                     $"Restoring server-authoritative access data for portal {portal.m_uid}.");
                 WriteAuthorityToZdo(portal, authority, forceSend: true);
-            }
-
-            if (!PublicPortalKinds.IsHandledPortal(portal))
-            {
-                continue;
             }
 
             Vector3 position = portal.GetPosition();
@@ -3233,11 +3204,6 @@ internal static partial class PublicPortalCatalog
         if (!ZdoMatchesAuthority(current, authority))
         {
             WriteAuthorityToZdo(current, authority, forceSend: true);
-        }
-
-        if (!PublicPortalKinds.IsHandledPortal(current))
-        {
-            return false;
         }
 
         if (!CanRecipientUseBaseAuthority(authority, recipient))

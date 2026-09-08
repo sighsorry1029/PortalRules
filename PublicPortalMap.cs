@@ -18,8 +18,7 @@ internal static class PublicPortalMap
     private static bool IsMapSelectionPortal(TeleportWorld portal)
     {
         if (portal == null ||
-            PublicPortalConfig.EnablePortalMap.Value.IsOff() ||
-            !PublicPortalKinds.IsHandledPortal(portal))
+            PublicPortalConfig.EnablePortalMap.Value.IsOff())
         {
             return false;
         }
@@ -116,7 +115,7 @@ internal static class PublicPortalMap
                 return true;
             }
 
-            if (!PublicPortalKinds.IsHandledPortal(sourcePortal))
+            if (sourcePortal == null)
             {
                 return true;
             }

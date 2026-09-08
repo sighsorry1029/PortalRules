@@ -91,6 +91,8 @@ Adjust the position and rotation for each location. Editing the YAML does not mo
 
 When `Enable Portal Map` is On, enter a handled non-Tagged portal to open the destination map. Select an accessible portal pin to travel.
 
+If the source portal does not allow all items, carrying a non-teleportable item shows Valheim's item restriction message without opening the map. Portals that allow every item show **All Items Teleportable** above their hover details.
+
 The arrow beside **Favorite Portals** collapses the list. Its state is saved locally.
 
 ## Access modes
@@ -147,11 +149,13 @@ Overall and Invite limits are shared by every character on the authenticated Ste
 - Favorites survive world reloads, but dismantling and rebuilding creates a new portal identity.
 - Rows stay in add order from oldest to newest; re-adding one moves it to the bottom.
 - At the 10-favorite limit, a new favorite may replace the oldest saved portal that is no longer available.
-- Invite cooldowns, fares, and blocked-item marks appear on pins or favorite rows.
+- Invite cooldowns and fares appear on pins or favorite rows.
 - `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show quota positions.
 - Tagged Admin portal prefabs remain usable as connected portals by every eligible player, but their map pins are visible only to server administrators in debug mode.
 
 If `Enable Portal Map` is Off, PortalRules uses connected destinations for all modes while still applying server authorization.
+
+The **CONNECTED** hover label is shown only for Tagged portals with a reciprocal connection. Other access modes omit the connection status label.
 
 ## Admin portals and GlobalKeys
 

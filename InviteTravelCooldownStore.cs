@@ -869,9 +869,26 @@ internal static class InviteTravelCooldownStore
 
     private static void PrunePendingReservations(long nowUtc)
     {
-        foreach (PendingReservation pending in PendingReservations.Values
-                     .Where(candidate => candidate.ExpiresAtUtc < nowUtc)
-                     .ToArray())
+        if (PendingReservations.Count == 0)
+        {
+            return;
+        }
+
+        List<PendingReservation>? expired = null;
+        foreach (PendingReservation pending in PendingReservations.Values)
+        {
+            if (pending.ExpiresAtUtc < nowUtc)
+            {
+                (expired ??= new List<PendingReservation>()).Add(pending);
+            }
+        }
+
+        if (expired == null)
+        {
+            return;
+        }
+
+        foreach (PendingReservation pending in expired)
         {
             RemovePendingReservation(pending);
         }

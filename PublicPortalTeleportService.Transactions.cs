@@ -568,6 +568,11 @@ internal static partial class PublicPortalTeleportService
 
     private static void TickServerTickets(float now)
     {
+        if (ServerTickets.Count == 0)
+        {
+            return;
+        }
+
         foreach (ServerTravelTicket ticket in ServerTickets.Values.ToArray())
         {
             if (ticket.Committed)

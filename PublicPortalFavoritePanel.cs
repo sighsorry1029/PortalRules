@@ -11,13 +11,14 @@ namespace PortalRules;
 
 internal sealed class PublicPortalFavoritePanel
 {
-    private const float PanelWidth = 320f;
+    private const float PanelWidth = 292f;
     private const float ExpandedPanelHeight = 420f;
     private const float CollapsedPanelHeight = 46f;
     private const float HeaderHeight = 30f;
     private const float HeaderToggleSize = 26f;
     private const float HeaderToggleGap = 7f;
     private const int ToggleIconPixels = 32;
+    private const float FareStateCheckIntervalSeconds = 0.2f;
 
     private static readonly Color UnaffordableColor =
         new(1f, 0.42f, 0.32f);
@@ -37,6 +38,48 @@ internal sealed class PublicPortalFavoritePanel
     private GameObject? _root;
     private Sprite? _collapseIcon;
     private Sprite? _expandIcon;
+    private float _nextFareStateCheckAt = -1f;
+    private FavoriteFareState? _fareState;
+    private Action<PublicPortalCatalogEntry>? _onTeleport;
+    private Action<PublicPortalCatalogEntry>? _onRemoveFavorite;
+    private Action<PublicPortalCatalogEntry>? _onHoverPortal;
+
+    private readonly struct FavoriteFareState : IEquatable<FavoriteFareState>
+    {
+        private readonly PublicPortalTravelCostScope _scope;
+        private readonly int _baseCoinCost;
+        private readonly float _includedDistanceMeters;
+        private readonly float _coinsPerKilometer;
+        private readonly string _inviteCooldownState;
+
+        internal readonly int LocalCoinCount;
+
+        internal FavoriteFareState(string inviteCooldownState)
+        {
+            _scope = PublicPortalConfig.TravelCostScope.Value;
+            _baseCoinCost = PublicPortalConfig.BaseCoinCost.Value;
+            _includedDistanceMeters =
+                PublicPortalConfig.BaseFareIncludedDistanceMeters.Value;
+            _coinsPerKilometer = PublicPortalConfig.CoinsPerKilometer.Value;
+            LocalCoinCount = PublicPortalTravelCost.IsEnabled
+                ? PortalCoinWallet.GetLocalCoinCount()
+                : 0;
+            _inviteCooldownState = inviteCooldownState;
+        }
+
+        public bool Equals(FavoriteFareState other)
+        {
+            return _scope == other._scope &&
+                   _baseCoinCost == other._baseCoinCost &&
+                   _includedDistanceMeters.Equals(other._includedDistanceMeters) &&
+                   _coinsPerKilometer.Equals(other._coinsPerKilometer) &&
+                   LocalCoinCount == other.LocalCoinCount &&
+                   string.Equals(
+                       _inviteCooldownState,
+                       other._inviteCooldownState,
+                       StringComparison.Ordinal);
+        }
+    }
 
     public bool IsVisible => _root != null;
 
@@ -45,17 +88,37 @@ internal sealed class PublicPortalFavoritePanel
 
     public void Refresh(
         PublicPortalCatalogEntry? sourcePortal,
-        bool itemsBlocked,
         IEnumerable<PublicPortalCatalogEntry> activePortals,
         Action<PublicPortalCatalogEntry> onTeleport,
         Action<PublicPortalCatalogEntry> onRemoveFavorite,
         Action<PublicPortalCatalogEntry> onHoverPortal)
+    {
+        Refresh(
+            sourcePortal,
+            activePortals,
+            onTeleport,
+            onRemoveFavorite,
+            onHoverPortal,
+            capturedFareState: null);
+    }
+
+    private void Refresh(
+        PublicPortalCatalogEntry? sourcePortal,
+        IEnumerable<PublicPortalCatalogEntry> activePortals,
+        Action<PublicPortalCatalogEntry> onTeleport,
+        Action<PublicPortalCatalogEntry> onRemoveFavorite,
+        Action<PublicPortalCatalogEntry> onHoverPortal,
+        FavoriteFareState? capturedFareState)
     {
         EnsureRoot();
         if (_root == null)
         {
             return;
         }
+
+        _onTeleport = onTeleport;
+        _onRemoveFavorite = onRemoveFavorite;
+        _onHoverPortal = onHoverPortal;
 
         foreach (Transform child in _root.transform.Cast<Transform>().ToArray())
         {
@@ -70,9 +133,13 @@ internal sealed class PublicPortalFavoritePanel
         SetPanelHeight(collapsed);
         if (collapsed)
         {
+            _fareState = null;
             return;
         }
 
+        FavoriteFareState fareState = capturedFareState ??
+            CaptureFavoriteFareState(activePortals);
+        _fareState = fareState;
         List<string> favoriteIds = PublicPortalData.ReadFavorites();
         Dictionary<string, PublicPortalCatalogEntry> portalsByFavoriteId =
             new(StringComparer.Ordinal);
@@ -101,16 +168,16 @@ internal sealed class PublicPortalFavoritePanel
             return;
         }
 
+        Sprite? coinIcon = null;
+        bool coinIconResolved = false;
         foreach (PublicPortalCatalogEntry portal in favorites)
         {
             PublicPortalCatalogEntry captured = portal;
-            bool isTravelTarget = false;
             int travelCost = 0;
             if (sourcePortal.HasValue)
             {
                 PublicPortalCatalogEntry source = sourcePortal.Value;
-                isTravelTarget = source.Id != portal.Id;
-                if (isTravelTarget)
+                if (source.Id != portal.Id)
                 {
                     travelCost = PublicPortalTravelCost.CalculateCost(
                         source,
@@ -126,17 +193,87 @@ internal sealed class PublicPortalFavoritePanel
                 ? InviteTravelCooldownStore.FormatRemaining(
                     remainingSeconds)
                 : "";
+            if (!inviteArrivalBlocked && travelCost > 0 && !coinIconResolved)
+            {
+                coinIcon = PublicPortalTravelCost.GetCoinIcon();
+                coinIconResolved = true;
+            }
+
             CreateButton(
                 _root.transform,
                 GetPortalDisplayName(portal),
                 travelCost,
-                isTravelTarget && itemsBlocked,
                 inviteArrivalBlocked,
                 cooldownText,
+                fareState,
+                coinIcon,
                 () => onTeleport(captured),
                 () => onRemoveFavorite(captured),
                 () => onHoverPortal(captured));
         }
+    }
+
+    public void Tick(
+        bool isSelecting,
+        PublicPortalCatalogEntry? sourcePortal,
+        IEnumerable<PublicPortalCatalogEntry> activePortals)
+    {
+        if (!isSelecting || !IsVisible || IsCollapsed ||
+            _onTeleport == null || _onRemoveFavorite == null || _onHoverPortal == null)
+        {
+            _fareState = null;
+            _nextFareStateCheckAt = -1f;
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (_nextFareStateCheckAt >= 0f && now < _nextFareStateCheckAt)
+        {
+            return;
+        }
+
+        _nextFareStateCheckAt = now + FareStateCheckIntervalSeconds;
+        FavoriteFareState currentState =
+            CaptureFavoriteFareState(activePortals);
+        if (!_fareState.HasValue)
+        {
+            _fareState = currentState;
+            return;
+        }
+
+        if (_fareState.Value.Equals(currentState))
+        {
+            return;
+        }
+
+        Refresh(
+            sourcePortal,
+            activePortals,
+            _onTeleport,
+            _onRemoveFavorite,
+            _onHoverPortal,
+            currentState);
+    }
+
+    private static FavoriteFareState CaptureFavoriteFareState(
+        IEnumerable<PublicPortalCatalogEntry> activePortals)
+    {
+        List<string> favoriteIds = PublicPortalData.ReadFavorites();
+        string inviteCooldownState = string.Join(
+            "|",
+            activePortals
+                .Where(portal =>
+                    favoriteIds.Contains(portal.FavoriteId) &&
+                    portal.AccessMode == PublicPortalAccessMode.Invite)
+                .OrderBy(portal => portal.FavoriteId, StringComparer.Ordinal)
+                .Select(portal =>
+                    InviteTravelCooldownStore.TryGetInviteArrivalCooldownRemaining(
+                        portal,
+                        out long remainingSeconds)
+                        ? $"{portal.FavoriteId}:" +
+                          InviteTravelCooldownStore.FormatRemaining(remainingSeconds)
+                        : $"{portal.FavoriteId}:-"));
+        return new FavoriteFareState(inviteCooldownState);
     }
 
     public void Destroy()
@@ -149,6 +286,11 @@ internal sealed class PublicPortalFavoritePanel
 
         DestroyIcon(ref _collapseIcon);
         DestroyIcon(ref _expandIcon);
+        _fareState = null;
+        _nextFareStateCheckAt = -1f;
+        _onTeleport = null;
+        _onRemoveFavorite = null;
+        _onHoverPortal = null;
     }
 
     private void EnsureRoot()
@@ -417,9 +559,10 @@ internal sealed class PublicPortalFavoritePanel
         Transform parent,
         string text,
         int travelCost,
-        bool itemsBlocked,
         bool cooldownBlocked,
         string cooldownText,
+        FavoriteFareState fareState,
+        Sprite? coinIcon,
         Action onClick,
         Action onRightClick,
         Action onPointerEnter)
@@ -449,11 +592,12 @@ internal sealed class PublicPortalFavoritePanel
             ? CreateCooldownDisplay(
                 buttonObject.transform,
                 cooldownText)
-            : travelCost > 0 || itemsBlocked
+            : travelCost > 0
                 ? CreateTravelInfoDisplay(
                     buttonObject.transform,
                     travelCost,
-                    itemsBlocked)
+                    fareState,
+                    coinIcon)
                 : 0f;
         Text label = CreateLabel(buttonObject.transform, text, 12, FontStyle.Normal);
         if (cooldownBlocked)
@@ -497,7 +641,8 @@ internal sealed class PublicPortalFavoritePanel
     private static float CreateTravelInfoDisplay(
         Transform parent,
         int travelCost,
-        bool itemsBlocked)
+        FavoriteFareState fareState,
+        Sprite? coinIcon)
     {
         GameObject infoRoot = new("TravelInfo", typeof(RectTransform));
         infoRoot.transform.SetParent(parent, false);
@@ -510,7 +655,6 @@ internal sealed class PublicPortalFavoritePanel
         float cursor = 0f;
         if (travelCost > 0)
         {
-            Sprite? coinIcon = PublicPortalTravelCost.GetCoinIcon();
             if (coinIcon != null)
             {
                 GameObject iconObject = new(
@@ -542,45 +686,13 @@ internal sealed class PublicPortalFavoritePanel
                 FontStyle.Bold);
             count.alignment = TextAnchor.MiddleLeft;
             count.horizontalOverflow = HorizontalWrapMode.Overflow;
-            count.color = PortalCoinWallet.GetLocalCoinCount() >= travelCost
+            count.color = fareState.LocalCoinCount >= travelCost
                 ? Color.white
                 : UnaffordableColor;
             count.raycastTarget = false;
             float countWidth = Mathf.Ceil(count.preferredWidth) + 2f;
             SetLeftAlignedRect((RectTransform)count.transform, cursor, countWidth);
             cursor += countWidth;
-        }
-
-        if (itemsBlocked &&
-            PublicPortalTravelCost.TryGetNoTeleportVisual(
-                out Sprite noTeleportSprite,
-                out Color noTeleportColor,
-                out Material? noTeleportMaterial))
-        {
-            if (cursor > 0f)
-            {
-                cursor += 8f;
-            }
-
-            GameObject iconObject = new(
-                "NoTeleportIcon",
-                typeof(RectTransform),
-                typeof(Image));
-            iconObject.transform.SetParent(infoRoot.transform, false);
-            RectTransform iconRect = (RectTransform)iconObject.transform;
-            SetLeftAlignedRect(iconRect, cursor, 20f);
-
-            Image icon = iconObject.GetComponent<Image>();
-            icon.sprite = noTeleportSprite;
-            icon.color = noTeleportColor;
-            if (noTeleportMaterial != null)
-            {
-                icon.material = noTeleportMaterial;
-            }
-
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
-            cursor += 20f;
         }
 
         infoRect.sizeDelta = new Vector2(cursor, 22f);

@@ -30,7 +30,6 @@ internal static class PublicPortalTaggedConnections
     private static bool IsTaggedConnectable(ZDO zdo)
     {
         return zdo != null &&
-               PublicPortalKinds.IsHandledPortal(zdo) &&
                PublicPortalCatalog.GetEffectiveAccessMode(zdo) == PublicPortalAccessMode.Tagged;
     }
 

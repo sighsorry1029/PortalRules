@@ -287,8 +287,7 @@ internal static class PublicPortalInteraction
         ZDO? zdo = ZDOMan.instance.GetZDO(portalId);
         if (zdo == null ||
             !zdo.IsValid() ||
-            !ZDOMan.instance.GetPortals().Contains(zdo) ||
-            !PublicPortalKinds.IsHandledPortal(zdo))
+            !ZDOMan.instance.GetPortals().Contains(zdo))
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_destination_not_managed_portal");
@@ -529,8 +528,7 @@ internal static class PublicPortalInteraction
             ZNet.instance == null ||
             !ZNet.instance.IsServer() ||
             ZDOMan.instance == null ||
-            !ZDOMan.instance.GetPortals().Contains(zdo) ||
-            !PublicPortalKinds.IsHandledPortal(zdo))
+            !ZDOMan.instance.GetPortals().Contains(zdo))
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_requested_portal_unavailable");
@@ -725,7 +723,7 @@ internal static class PublicPortalInteraction
     {
         private static void Postfix(TeleportWorld __instance)
         {
-            if (!PublicPortalKinds.IsHandledPortal(__instance) ||
+            if (__instance == null ||
                 ZNet.instance == null ||
                 !ZNet.instance.IsServer())
             {
@@ -860,18 +858,46 @@ internal static class PublicPortalInteraction
     {
         private static void Postfix(TeleportWorld __instance, ref string __result)
         {
-            if (!PublicPortalKinds.IsHandledPortal(__instance))
+            if (__instance == null)
             {
                 return;
             }
 
+            string allItemsHeader = __instance.m_allowAllItems
+                ? "<color=#B8EBB8>" + PortalRulesLocalization.Translate(
+                    "$sighsorry_portalrules_hover_all_items_teleportable") +
+                  "</color>\n"
+                : "";
             ZDO? zdo = PublicPortalKinds.GetPortalZdo(__instance);
             if (zdo == null)
             {
+                __result = allItemsHeader + __result;
                 return;
             }
 
             PublicPortalAccessMode mode = PublicPortalCatalog.GetEffectiveAccessMode(zdo);
+            string connectedLabel = Localization.instance != null
+                ? Localization.instance.Localize("$piece_portal_connected")
+                : "$piece_portal_connected";
+            string unconnectedLabel = Localization.instance != null
+                ? Localization.instance.Localize("$piece_portal_unconnected")
+                : "$piece_portal_unconnected";
+            string connectionStatus = mode == PublicPortalAccessMode.Tagged
+                ? HasMutualPortalConnection(zdo) ? connectedLabel : unconnectedLabel
+                : "";
+            string portalTagHeader = "$piece_portal $piece_portal_tag:\"" +
+                                     __instance.GetText().RemoveRichTextTags() + "\"";
+            if (Localization.instance != null)
+            {
+                portalTagHeader = Localization.instance.Localize(portalTagHeader);
+            }
+
+            __result = allItemsHeader + SetConnectionStatusAfterPortalTag(
+                __result,
+                portalTagHeader,
+                connectedLabel,
+                unconnectedLabel,
+                connectionStatus);
             if (PublicPortalAccess.CanEditPortal(zdo))
             {
                 string useKey = Localization.instance != null ? Localization.instance.Localize("$KEY_Use") : "$KEY_Use";
@@ -959,6 +985,89 @@ internal static class PublicPortalInteraction
         }
     }
 
+    private static bool HasMutualPortalConnection(ZDO source)
+    {
+        if (!source.IsValid() || ZDOMan.instance == null)
+        {
+            return false;
+        }
+
+        ZDOID targetId = source.GetConnectionZDOID(
+            ZDOExtraData.ConnectionType.Portal);
+        if (targetId.IsNone() || targetId == source.m_uid)
+        {
+            return false;
+        }
+
+        ZDO? target = ZDOMan.instance.GetZDO(targetId);
+        return target != null && target.IsValid() &&
+               target.GetConnectionZDOID(ZDOExtraData.ConnectionType.Portal) ==
+               source.m_uid;
+    }
+
+    private static string SetConnectionStatusAfterPortalTag(
+        string hoverText,
+        string portalTagHeader,
+        string connectedLabel,
+        string unconnectedLabel,
+        string connectionStatus)
+    {
+        if (string.IsNullOrEmpty(hoverText) ||
+            string.IsNullOrEmpty(portalTagHeader) ||
+            !hoverText.StartsWith(portalTagHeader, StringComparison.Ordinal))
+        {
+            return hoverText;
+        }
+
+        // The actual sanitized, localized tag fixes the boundary even when a
+        // saved or externally supplied tag contains quotes or line breaks.
+        int suffixStart = portalTagHeader.Length;
+        string connectedSuffix = "  [" + connectedLabel + "]";
+        string unconnectedSuffix = "  [" + unconnectedLabel + "]";
+        int remainingLength = hoverText.Length - suffixStart;
+        bool hasConnectedSuffix = remainingLength >= connectedSuffix.Length &&
+                                  string.CompareOrdinal(
+                                      hoverText, suffixStart,
+                                      connectedSuffix, 0,
+                                      connectedSuffix.Length) == 0;
+        int suffixLength = hasConnectedSuffix
+            ? connectedSuffix.Length
+            : remainingLength >= unconnectedSuffix.Length &&
+              string.CompareOrdinal(
+                  hoverText, suffixStart,
+                  unconnectedSuffix, 0,
+                  unconnectedSuffix.Length) == 0
+                ? unconnectedSuffix.Length
+                : 0;
+        if (suffixLength == 0)
+        {
+            return hoverText;
+        }
+
+        int suffixEnd = suffixStart + suffixLength;
+        if (suffixEnd < hoverText.Length &&
+            hoverText[suffixEnd] != '\n' &&
+            !(hoverText[suffixEnd] == '\r' &&
+              suffixEnd + 1 < hoverText.Length &&
+              hoverText[suffixEnd + 1] == '\n'))
+        {
+            return hoverText;
+        }
+
+        if (string.Equals(
+                connectionStatus,
+                hasConnectedSuffix ? connectedLabel : unconnectedLabel,
+                StringComparison.Ordinal))
+        {
+            return hoverText;
+        }
+
+        string replacement = string.IsNullOrEmpty(connectionStatus)
+            ? ""
+            : "  [" + connectionStatus + "]";
+        return portalTagHeader + replacement + hoverText.Substring(suffixEnd);
+    }
+
     private static bool TryGetTemporaryPublicRemainingSeconds(
         ZDO zdo,
         out int remainingSeconds)
@@ -1001,7 +1110,7 @@ internal static class PublicPortalInteraction
         {
             if (hold ||
                 human != Player.m_localPlayer ||
-                !PublicPortalKinds.IsHandledPortal(__instance))
+                __instance == null)
             {
                 return true;
             }

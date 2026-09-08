@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace PortalRules;
 
@@ -120,31 +119,6 @@ internal static class PublicPortalTravelCost
         }
 
         return coin.GetIcon();
-    }
-
-    internal static bool TryGetNoTeleportVisual(
-        out Sprite sprite,
-        out Color color,
-        out Material? material)
-    {
-        Image? source = InventoryGui.instance?
-            .m_playerGrid?
-            .m_elementPrefab?
-            .transform
-            .Find("noteleport")?
-            .GetComponent<Image>();
-        if (source == null || source.sprite == null)
-        {
-            sprite = null!;
-            color = Color.white;
-            material = null;
-            return false;
-        }
-
-        sprite = source.sprite;
-        color = source.color;
-        material = source.material;
-        return true;
     }
 
     private static bool TryGetDistanceXZ(

@@ -1,6 +1,6 @@
 {
   "name": "PortalRules",
-  "version_number": "1.0.2",
+  "version_number": "1.0.3",
   "website_url": "https://discord.gg/jkcJCq2sK5",
   "description": "Adds secure portal travel with a map for choosing destinations, Personal, Public, Invite, Clan and Tagged access modes, Steam account and Clan limits, Admin portals, GlobalKey gates, favorites, cooldowns, and optional distance-based Coin fares.",
   "dependencies": [

@@ -11,13 +11,10 @@ internal static class PublicPortalConnectedHud
 {
     private static readonly Color UnaffordableTravelColor =
         new(1f, 0.42f, 0.32f);
-    private static readonly Color AllItemsTravelColor =
-        new(0.72f, 0.92f, 0.72f);
     private static Hud? ConnectedTravelHud;
     private static GameObject? ConnectedTravelBadge;
     private static Image? ConnectedTravelCoinIcon;
     private static TextMeshProUGUI? ConnectedTravelCostText;
-    private static TextMeshProUGUI? ConnectedTravelAllItemsText;
     private static string ConnectedTravelLayoutText = "";
     private static Vector2 ConnectedTravelLayoutSize =
         new(float.NaN, float.NaN);
@@ -34,7 +31,6 @@ internal static class PublicPortalConnectedHud
         ConnectedTravelBadge = null;
         ConnectedTravelCoinIcon = null;
         ConnectedTravelCostText = null;
-        ConnectedTravelAllItemsText = null;
         ConnectedTravelLayoutText = "";
         ConnectedTravelLayoutSize = new Vector2(float.NaN, float.NaN);
         ConnectedTravelLayoutFontSize = float.NaN;
@@ -55,8 +51,8 @@ internal static class PublicPortalConnectedHud
                 return;
             }
 
-            UpdateConnectedTravelBadge(travelCost, allowsAllItems);
-            PositionConnectedTravelBadge(__instance);
+            UpdateConnectedTravelBadge(travelCost);
+            PositionConnectedTravelBadge(__instance, allowsAllItems);
         }
     }
 
@@ -76,8 +72,7 @@ internal static class PublicPortalConnectedHud
         TeleportWorld? sourcePortal = hoverObject != null
             ? hoverObject.GetComponentInParent<TeleportWorld>()
             : null;
-        if (sourcePortal == null ||
-            !PublicPortalKinds.IsHandledPortal(sourcePortal))
+        if (sourcePortal == null)
         {
             return false;
         }
@@ -111,7 +106,7 @@ internal static class PublicPortalConnectedHud
 
         travelCost = PublicPortalTravelCost.CalculateCost(sourceEntry, targetEntry);
         allowsAllItems = sourcePortal.m_allowAllItems;
-        return travelCost > 0 || allowsAllItems;
+        return travelCost > 0;
     }
 
     private static bool EnsureConnectedTravelBadge(Hud hud)
@@ -124,8 +119,7 @@ internal static class PublicPortalConnectedHud
         if (ConnectedTravelHud == hud &&
             ConnectedTravelBadge != null &&
             ConnectedTravelCoinIcon != null &&
-            ConnectedTravelCostText != null &&
-            ConnectedTravelAllItemsText != null)
+            ConnectedTravelCostText != null)
         {
             if (ConnectedTravelCoinIcon.sprite == null)
             {
@@ -194,58 +188,29 @@ internal static class PublicPortalConnectedHud
         count.overflowMode = TextOverflowModes.Overflow;
         count.raycastTarget = false;
 
-        GameObject allItemsObject = new(
-            "AllItems",
-            typeof(RectTransform),
-            typeof(TextMeshProUGUI));
-        allItemsObject.layer = badge.layer;
-        allItemsObject.transform.SetParent(badge.transform, false);
-        TextMeshProUGUI allItems =
-            allItemsObject.GetComponent<TextMeshProUGUI>();
-        allItems.font = hud.m_hoverName.font;
-        allItems.fontSharedMaterial = hud.m_hoverName.fontSharedMaterial;
-        allItems.fontSize = Mathf.Max(
-            14f,
-            hud.m_hoverName.fontSize * 0.75f);
-        allItems.fontStyle = FontStyles.Bold;
-        allItems.alignment = TextAlignmentOptions.Left;
-        allItems.textWrappingMode = TextWrappingModes.NoWrap;
-        allItems.overflowMode = TextOverflowModes.Overflow;
-        allItems.color = AllItemsTravelColor;
-        allItems.text = PortalRulesLocalization.Translate(
-            "$sighsorry_portalrules_all_items");
-        allItems.raycastTarget = false;
-
         badge.SetActive(false);
         ConnectedTravelHud = hud;
         ConnectedTravelBadge = badge;
         ConnectedTravelCoinIcon = icon;
         ConnectedTravelCostText = count;
-        ConnectedTravelAllItemsText = allItems;
         ConnectedTravelLayoutText = "";
         ConnectedTravelLayoutSize = new Vector2(float.NaN, float.NaN);
         ConnectedTravelLayoutFontSize = float.NaN;
         return true;
     }
 
-    private static void UpdateConnectedTravelBadge(
-        int travelCost,
-        bool allowsAllItems)
+    private static void UpdateConnectedTravelBadge(int travelCost)
     {
         if (ConnectedTravelBadge == null ||
             ConnectedTravelCoinIcon == null ||
-            ConnectedTravelCostText == null ||
-            ConnectedTravelAllItemsText == null)
+            ConnectedTravelCostText == null)
         {
             return;
         }
 
         float cursor = 0f;
-        bool hasCost = travelCost > 0;
-        Sprite? coinIcon = hasCost
-            ? ConnectedTravelCoinIcon.sprite ??
-              PublicPortalTravelCost.GetCoinIcon()
-            : null;
+        Sprite? coinIcon = ConnectedTravelCoinIcon.sprite ??
+                           PublicPortalTravelCost.GetCoinIcon();
         bool showCoinIcon = coinIcon != null;
         ConnectedTravelCoinIcon.gameObject.SetActive(showCoinIcon);
         if (showCoinIcon)
@@ -258,50 +223,24 @@ internal static class PublicPortalConnectedHud
             cursor += 24f;
         }
 
-        ConnectedTravelCostText.gameObject.SetActive(hasCost);
-        if (hasCost)
-        {
-            ConnectedTravelCostText.text = showCoinIcon
-                ? PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_quantity",
-                    travelCost.ToString())
-                : PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_coins_quantity",
-                    travelCost.ToString());
-            ConnectedTravelCostText.color =
-                PortalCoinWallet.GetLocalCoinCount() >= travelCost
-                    ? Color.white
-                    : UnaffordableTravelColor;
-            float costWidth =
-                Mathf.Ceil(ConnectedTravelCostText.preferredWidth) + 2f;
-            SetConnectedTravelChildRect(
-                ConnectedTravelCostText.rectTransform,
-                cursor,
-                costWidth);
-            cursor += costWidth;
-        }
-
-        ConnectedTravelAllItemsText.gameObject.SetActive(allowsAllItems);
-        if (allowsAllItems)
-        {
-            if (cursor > 0f)
-            {
-                cursor += 8f;
-            }
-
-            ConnectedTravelAllItemsText.text = hasCost
-                ? PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_all_items_bulleted")
-                : PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_all_items");
-            float allItemsWidth =
-                Mathf.Ceil(ConnectedTravelAllItemsText.preferredWidth) + 2f;
-            SetConnectedTravelChildRect(
-                ConnectedTravelAllItemsText.rectTransform,
-                cursor,
-                allItemsWidth);
-            cursor += allItemsWidth;
-        }
+        ConnectedTravelCostText.text = showCoinIcon
+            ? PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_quantity",
+                travelCost.ToString())
+            : PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_coins_quantity",
+                travelCost.ToString());
+        ConnectedTravelCostText.color =
+            PortalCoinWallet.GetLocalCoinCount() >= travelCost
+                ? Color.white
+                : UnaffordableTravelColor;
+        float costWidth =
+            Mathf.Ceil(ConnectedTravelCostText.preferredWidth) + 2f;
+        SetConnectedTravelChildRect(
+            ConnectedTravelCostText.rectTransform,
+            cursor,
+            costWidth);
+        cursor += costWidth;
 
         ((RectTransform)ConnectedTravelBadge.transform).sizeDelta =
             new Vector2(cursor, 22f);
@@ -323,7 +262,7 @@ internal static class PublicPortalConnectedHud
         rect.sizeDelta = new Vector2(width, 20f);
     }
 
-    private static void PositionConnectedTravelBadge(Hud hud)
+    private static void PositionConnectedTravelBadge(Hud hud, bool hasAllItemsHeader)
     {
         if (ConnectedTravelBadge == null || hud.m_hoverName == null)
         {
@@ -354,17 +293,34 @@ internal static class PublicPortalConnectedHud
         {
             hud.m_hoverName.ForceMeshUpdate();
             TMP_TextInfo textInfo = hud.m_hoverName.textInfo;
-            if (textInfo == null ||
-                textInfo.lineCount <= 0 ||
-                textInfo.lineInfo[0].characterCount <= 0)
+            if (textInfo == null || textInfo.lineCount <= 0)
             {
                 SetConnectedTravelFallbackPosition(badgeRect);
                 return;
             }
 
-            TMP_LineInfo firstLine = textInfo.lineInfo[0];
-            float x = firstLine.lineExtents.max.x + 6f;
-            float y = (firstLine.ascender + firstLine.descender) * 0.5f;
+            // Rich-text source indices keep the fare on the tag line even if
+            // the all-items header wraps across several rendered lines.
+            int tagStartIndex = hasAllItemsHeader ? hoverText.IndexOf('\n') + 1 : 0;
+            int tagLineIndex = 0;
+            for (int i = 0; i < textInfo.characterCount; i++)
+            {
+                if (textInfo.characterInfo[i].index >= tagStartIndex)
+                {
+                    tagLineIndex = textInfo.characterInfo[i].lineNumber;
+                    break;
+                }
+            }
+
+            TMP_LineInfo tagLine = textInfo.lineInfo[tagLineIndex];
+            if (tagLine.characterCount <= 0)
+            {
+                SetConnectedTravelFallbackPosition(badgeRect);
+                return;
+            }
+
+            float x = tagLine.lineExtents.max.x + 6f;
+            float y = (tagLine.ascender + tagLine.descender) * 0.5f;
             if (float.IsNaN(x) ||
                 float.IsInfinity(x) ||
                 float.IsNaN(y) ||
@@ -383,7 +339,7 @@ internal static class PublicPortalConnectedHud
         {
             SetConnectedTravelFallbackPosition(badgeRect);
             PortalRulesPlugin.PortalRulesLogger.LogDebug(
-                $"Could not align the connected portal fare with the first hover line: {ex.Message}");
+                $"Could not align the connected portal fare with the portal tag line: {ex.Message}");
         }
     }
 

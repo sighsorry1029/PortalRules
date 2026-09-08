@@ -41,16 +41,6 @@ internal static class PublicPortalKinds
         return portal != null && portal.m_allowAllItems;
     }
 
-    internal static bool IsHandledPortal(TeleportWorld portal)
-    {
-        return portal != null;
-    }
-
-    internal static bool IsHandledPortal(ZDO zdo)
-    {
-        return zdo != null;
-    }
-
     internal static ZDO? GetPortalZdo(TeleportWorld portal)
     {
         if (portal == null)

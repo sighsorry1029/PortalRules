@@ -394,8 +394,7 @@ internal static partial class PublicPortalTeleportService
 
     internal static bool TryBeginConnectedTeleport(TeleportWorld sourcePortal)
     {
-        if (sourcePortal == null ||
-            !PublicPortalKinds.IsHandledPortal(sourcePortal))
+        if (sourcePortal == null)
         {
             return false;
         }
@@ -852,16 +851,7 @@ internal static partial class PublicPortalTeleportService
         {
             TeleportGrantPayload payload =
                 TeleportGrantPayload.Read(package);
-            HandleTeleportGrant(
-                payload.RequestId,
-                payload.Kind,
-                payload.Success,
-                payload.TargetPortalId,
-                payload.TargetPosition,
-                payload.TargetRotation,
-                payload.CoinCost,
-                payload.Ticket,
-                payload.Denial);
+            HandleTeleportGrant(payload);
         }
         catch (Exception ex)
         {
@@ -879,35 +869,26 @@ internal static partial class PublicPortalTeleportService
         }
     }
 
-    private static void HandleTeleportGrant(
-        long requestId,
-        TeleportRequestKind kind,
-        bool success,
-        ZDOID targetPortalId,
-        Vector3 position,
-        Quaternion rotation,
-        int coinCost,
-        string ticket,
-        PortalTravelDenial denial)
+    private static void HandleTeleportGrant(TeleportGrantPayload payload)
     {
         PendingRequest? pendingRequest = _pendingRequest;
-        if (requestId == 0L ||
+        if (payload.RequestId == 0L ||
             pendingRequest == null ||
-            requestId != pendingRequest.RequestId ||
-            targetPortalId != pendingRequest.TargetId ||
-            kind != pendingRequest.Kind)
+            payload.RequestId != pendingRequest.RequestId ||
+            payload.TargetPortalId != pendingRequest.TargetId ||
+            payload.Kind != pendingRequest.Kind)
         {
             // A valid late grant can otherwise hold an Invite direction until
             // the server-side ticket expires. Do not cancel the ticket that is
             // already being committed after an accepted duplicate grant.
-            if (ticket.Length > 0 &&
+            if (payload.Ticket.Length > 0 &&
                 (_pendingCommit == null ||
                  !string.Equals(
                      _pendingCommit.Ticket,
-                     ticket,
+                     payload.Ticket,
                      StringComparison.Ordinal)))
             {
-                SendTravelCancel(ticket);
+                SendTravelCancel(payload.Ticket);
             }
 
             return;
@@ -917,7 +898,7 @@ internal static partial class PublicPortalTeleportService
             PendingRequestTimeoutSeconds)
         {
             CancelPending();
-            SendTravelCancel(ticket);
+            SendTravelCancel(payload.Ticket);
             Player.m_localPlayer?.Message(
                 MessageHud.MessageType.Center,
                 PortalRulesLocalization.Translate(
@@ -931,18 +912,18 @@ internal static partial class PublicPortalTeleportService
         float exitDistance = pendingRequest.ExitDistance;
         Action? completionAction = pendingRequest.CompletionAction;
         CancelPending();
-        if (!success || coinCost < 0 ||
-            kind == TeleportRequestKind.MapOpen && ticket.Length != 0 ||
-            kind != TeleportRequestKind.MapOpen &&
-            coinCost > 0 && ticket.Length == 0)
+        if (!payload.Success || payload.CoinCost < 0 ||
+            payload.Kind == TeleportRequestKind.MapOpen && payload.Ticket.Length != 0 ||
+            payload.Kind != TeleportRequestKind.MapOpen &&
+            payload.CoinCost > 0 && payload.Ticket.Length == 0)
         {
-            SendTravelCancel(ticket);
-            ShowTravelDenial(Player.m_localPlayer, denial);
+            SendTravelCancel(payload.Ticket);
+            ShowTravelDenial(Player.m_localPlayer, payload.Denial);
             PublicPortalCatalog.RequestRefresh(force: true);
             return;
         }
 
-        if (kind == TeleportRequestKind.MapOpen)
+        if (payload.Kind == TeleportRequestKind.MapOpen)
         {
             completionAction?.Invoke();
             return;
@@ -955,28 +936,28 @@ internal static partial class PublicPortalTeleportService
             Player.m_localPlayer?.Message(
                 MessageHud.MessageType.Center,
                 localMessage);
-            SendTravelCancel(ticket);
+            SendTravelCancel(payload.Ticket);
             PublicPortalCatalog.RequestRefresh(force: true);
             return;
         }
 
         bool teleportStarted = CompleteTeleport(
-            position,
-            rotation,
+            payload.TargetPosition,
+            payload.TargetRotation,
             exitDistance,
-            coinCost,
-            kind,
+            payload.CoinCost,
+            payload.Kind,
             sourceAllowsAllItems,
             completionAction);
         if (!teleportStarted)
         {
-            SendTravelCancel(ticket);
+            SendTravelCancel(payload.Ticket);
             return;
         }
 
-        if (ticket.Length > 0)
+        if (payload.Ticket.Length > 0)
         {
-            BeginPendingCommit(ticket);
+            BeginPendingCommit(payload.Ticket);
         }
     }
 
@@ -1275,7 +1256,6 @@ internal static partial class PublicPortalTeleportService
                 : Vector3.positiveInfinity;
         if (sourcePortal == null ||
             !sourcePortal.IsValid() ||
-            !PublicPortalKinds.IsHandledPortal(sourcePortal) ||
             !IsFinite(playerPosition) ||
             !IsFinite(sourcePosition) ||
             Vector3.Distance(
@@ -1304,7 +1284,7 @@ internal static partial class PublicPortalTeleportService
         return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
-    private static bool CanTeleportWithItems(bool sourceAllowsAllItems)
+    internal static bool CanTeleportWithItems(bool sourceAllowsAllItems)
     {
         Player? player = Player.m_localPlayer;
         if (player == null)
