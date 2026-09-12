@@ -85,6 +85,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
         catch
         {
             Config.SettingChanged -= OnConfigSettingChanged;
+            PublicPortalConfig.Shutdown();
             Config.SaveOnConfigSet = _originalSaveOnConfigSet;
             throw;
         }
@@ -117,6 +118,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
         try
         {
             TryCleanup("configuration persistence", ShutdownConfigPersistence);
+            TryCleanup("portal configuration", PublicPortalConfig.Shutdown);
             TryCleanup("portal map", PublicPortalMapController.Instance.End);
             TryCleanup("connected portal HUD", PublicPortalConnectedHud.Shutdown);
             TryCleanup("portal catalog", PublicPortalCatalog.Shutdown);

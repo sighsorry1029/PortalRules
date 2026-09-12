@@ -183,6 +183,24 @@ try {
             $failures.Add('Config save debounce does not distinguish ServerSync updates')
         }
     }
+    $portalConfigType = $module.Types |
+        Where-Object FullName -eq 'PortalRules.PublicPortalConfig'
+    $subscribeSettings = $portalConfigType.Methods |
+        Where-Object Name -eq 'SubscribeToSettingChanges'
+    $shutdownSettings = $portalConfigType.Methods |
+        Where-Object Name -eq 'Shutdown'
+    $settingAdds = @($subscribeSettings.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.Name -eq 'add_SettingChanged'
+    }).Count
+    $settingRemoves = @($shutdownSettings.Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.Name -eq 'remove_SettingChanged'
+    }).Count
+    if ($settingAdds -ne 9 -or $settingRemoves -ne 9) {
+        $failures.Add(
+            "Live config subscriptions are not symmetric: add=$settingAdds remove=$settingRemoves")
+    }
     if ($failures.Count) { throw ($failures -join "`n") }
     [pscustomobject]@{
         GameMemberInstructionsResolved = $references
@@ -194,6 +212,7 @@ try {
         PrivateFieldContractsChecked = 5
         WheelTranspilerAnchors = $wheelMatches
         ConfigPersistenceContractsChecked = 4
+        LiveConfigSubscriptionsChecked = $settingAdds
         Note = 'Static metadata/IL checks; does not install Harmony patches or execute Unity.'
     } | ConvertTo-Json -Depth 4
 }

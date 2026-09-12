@@ -7,6 +7,8 @@ namespace PortalRules;
 
 internal static class PublicPortalConfig
 {
+    private static bool _settingHandlersRegistered;
+
     public static ConfigEntry<PortalRulesPlugin.Toggle> EnablePortalMap = null!;
     public static ConfigEntry<KeyboardShortcut> ToggleAccessiblePortalsKey = null!;
     public static ConfigEntry<float> AutoCloseGraceSeconds = null!;
@@ -26,6 +28,8 @@ internal static class PublicPortalConfig
 
     public static void Init(PortalRulesPlugin plugin)
     {
+        Shutdown();
+
         EnablePortalMap = plugin.ConfigEntry(
             "2 - Portal Map",
             "Enable Portal Map",
@@ -70,10 +74,6 @@ internal static class PublicPortalConfig
             order: 50,
             categoryOrder: 400,
             browsable: false);
-        FavoritePortalListCollapsed.SettingChanged += (_, _) =>
-            PublicPortalMapController.Instance
-                .RefreshFavoritePanelFromPreference();
-
         ToggleAccessKey = plugin.ConfigEntry(
             "3 - Access Modes",
             "Portal Access Modifier Key",
@@ -92,9 +92,6 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<int>(0, 604800)),
             order: 500,
             categoryOrder: 300);
-        PublicAccessDurationSeconds.SettingChanged += (_, _) =>
-            PublicPortalCatalog.RefreshTemporaryPublicConfiguration();
-
         MaxInvitePortalsPerAccount = plugin.ConfigEntry(
             "3 - Access Modes",
             "Max Invite Portals Per Account",
@@ -122,11 +119,6 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<float>(0f, 8760f)),
             order: 200,
             categoryOrder: 300);
-        System.EventHandler inviteCooldownSettingChanged = (_, _) =>
-            PublicPortalCatalog.RefreshInviteCooldownConfiguration();
-        InviteDepartureCooldownHours.SettingChanged += inviteCooldownSettingChanged;
-        InviteArrivalCooldownHours.SettingChanged += inviteCooldownSettingChanged;
-
         MaxClanPortalsPerClan = plugin.ConfigEntry(
             "3 - Access Modes",
             "Max Clan Portals Per Clan",
@@ -161,14 +153,6 @@ internal static class PublicPortalConfig
             order: 100,
             categoryOrder: 200);
 
-        System.EventHandler quotaSettingChanged = (_, _) =>
-            PublicPortalServerPolicy.NotifyQuotaConfigurationChanged();
-        EnableAccountPortalLimit.SettingChanged += quotaSettingChanged;
-        MaxPortalsPerAccount.SettingChanged += quotaSettingChanged;
-        MaxInvitePortalsPerAccount.SettingChanged += quotaSettingChanged;
-        MaxClanPortalsPerClan.SettingChanged += quotaSettingChanged;
-        CountedPortalPrefabs.SettingChanged += quotaSettingChanged;
-
         PortalFareMode = plugin.ConfigEntry(
             "5 - Portal Travel Costs",
             "Portal Fare Mode",
@@ -185,6 +169,95 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<float>(0f, 1000000f)),
             order: 100,
             categoryOrder: 100);
+
+        SubscribeToSettingChanges();
+    }
+
+    internal static void Shutdown()
+    {
+        if (!_settingHandlersRegistered)
+        {
+            return;
+        }
+
+        FavoritePortalListCollapsed.SettingChanged -=
+            OnFavoritePortalListCollapsedChanged;
+        PublicAccessDurationSeconds.SettingChanged -=
+            OnPublicAccessDurationChanged;
+        InviteDepartureCooldownHours.SettingChanged -=
+            OnInviteCooldownChanged;
+        InviteArrivalCooldownHours.SettingChanged -=
+            OnInviteCooldownChanged;
+        EnableAccountPortalLimit.SettingChanged -=
+            OnQuotaSettingChanged;
+        MaxPortalsPerAccount.SettingChanged -=
+            OnQuotaSettingChanged;
+        MaxInvitePortalsPerAccount.SettingChanged -=
+            OnQuotaSettingChanged;
+        MaxClanPortalsPerClan.SettingChanged -=
+            OnQuotaSettingChanged;
+        CountedPortalPrefabs.SettingChanged -=
+            OnQuotaSettingChanged;
+        _settingHandlersRegistered = false;
+    }
+
+    private static void SubscribeToSettingChanges()
+    {
+        _settingHandlersRegistered = true;
+        try
+        {
+            FavoritePortalListCollapsed.SettingChanged +=
+                OnFavoritePortalListCollapsedChanged;
+            PublicAccessDurationSeconds.SettingChanged +=
+                OnPublicAccessDurationChanged;
+            InviteDepartureCooldownHours.SettingChanged +=
+                OnInviteCooldownChanged;
+            InviteArrivalCooldownHours.SettingChanged +=
+                OnInviteCooldownChanged;
+            EnableAccountPortalLimit.SettingChanged +=
+                OnQuotaSettingChanged;
+            MaxPortalsPerAccount.SettingChanged +=
+                OnQuotaSettingChanged;
+            MaxInvitePortalsPerAccount.SettingChanged +=
+                OnQuotaSettingChanged;
+            MaxClanPortalsPerClan.SettingChanged +=
+                OnQuotaSettingChanged;
+            CountedPortalPrefabs.SettingChanged +=
+                OnQuotaSettingChanged;
+        }
+        catch
+        {
+            Shutdown();
+            throw;
+        }
+    }
+
+    private static void OnFavoritePortalListCollapsedChanged(
+        object sender,
+        EventArgs args)
+    {
+        PublicPortalMapController.Instance.RefreshFavoritePanelFromPreference();
+    }
+
+    private static void OnPublicAccessDurationChanged(
+        object sender,
+        EventArgs args)
+    {
+        PublicPortalCatalog.RefreshTemporaryPublicConfiguration();
+    }
+
+    private static void OnInviteCooldownChanged(
+        object sender,
+        EventArgs args)
+    {
+        PublicPortalCatalog.RefreshInviteCooldownConfiguration();
+    }
+
+    private static void OnQuotaSettingChanged(
+        object sender,
+        EventArgs args)
+    {
+        PublicPortalServerPolicy.NotifyQuotaConfigurationChanged();
     }
 
     private static PublicPortalFareMode ReadLegacyFareModeDefault(
