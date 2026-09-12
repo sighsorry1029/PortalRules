@@ -1,12 +1,42 @@
+using BepInEx;
 using BepInEx.Configuration;
 using System;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using ServerSync;
 using UnityEngine;
 
 namespace PortalRules;
 
 internal static class PublicPortalConfig
 {
+    private static readonly ConfigSync ConfigSync =
+        new(PortalRulesPlugin.ModGUID)
+        {
+            DisplayName = PortalRulesPlugin.ModName,
+            CurrentVersion = PortalRulesPlugin.ModVersion,
+            MinimumRequiredVersion = PortalRulesPlugin.ModVersion
+        };
+    private static readonly string ConfigFileName =
+        $"{PortalRulesPlugin.ModGUID}.cfg";
+    private static readonly string ConfigFileFullPath =
+        Paths.ConfigPath + Path.DirectorySeparatorChar + ConfigFileName;
+    private const float ConfigSaveDebounceSeconds = 0.5f;
+    private const float ConfigReloadDebounceSeconds = 0.25f;
+    private const float ConfigIoRetrySeconds = 1f;
+
+    private static ConfigFile? _config;
+    private static FileSystemWatcher? _watcher;
+    private static bool _configurationInitialized;
+    private static bool _configPersistenceActive;
+    private static bool _originalSaveOnConfigSet;
+    private static bool _configSavePending;
+    private static bool _configReloadPending;
+    private static bool _processingConfigReload;
+    private static float _configSaveAt;
+    private static float _configReloadAt;
+    private static string _knownConfigFingerprint = "";
     private static bool _settingHandlersRegistered;
 
     public static ConfigEntry<PortalRulesPlugin.Toggle> EnablePortalMap = null!;
@@ -26,18 +56,43 @@ internal static class PublicPortalConfig
     public static ConfigEntry<PublicPortalFareMode> PortalFareMode = null!;
     public static ConfigEntry<float> CoinsPerWeightKilometer = null!;
 
-    public static void Init(PortalRulesPlugin plugin)
+    internal static void Initialize(ConfigFile config)
     {
         Shutdown();
+        _config = config;
+        _originalSaveOnConfigSet = config.SaveOnConfigSet;
+        config.SaveOnConfigSet = false;
+        _configurationInitialized = true;
+        try
+        {
+            BindEntries(config);
+        }
+        catch
+        {
+            Shutdown();
+            throw;
+        }
+    }
 
-        EnablePortalMap = plugin.ConfigEntry(
+    private static void BindEntries(ConfigFile config)
+    {
+        ConfigEntry<PortalRulesPlugin.Toggle> serverConfigLocked = ConfigEntry(
+            "1 - General",
+            "Lock Configuration",
+            PortalRulesPlugin.Toggle.On,
+            "If on, the configuration is locked and can be changed by server admins only.",
+            order: 200,
+            categoryOrder: 500);
+        _ = ConfigSync.AddLockingConfigEntry(serverConfigLocked);
+
+        EnablePortalMap = ConfigEntry(
             "2 - Portal Map",
             "Enable Portal Map",
             PortalRulesPlugin.Toggle.On,
             "If on, entering a portal opens a portal target map.",
             order: 400,
             categoryOrder: 400);
-        ToggleAccessiblePortalsKey = plugin.ConfigEntry(
+        ToggleAccessiblePortalsKey = ConfigEntry(
             "2 - Portal Map",
             "Toggle Accessible Portal Pins Key",
             new KeyboardShortcut(KeyCode.P),
@@ -45,7 +100,7 @@ internal static class PublicPortalConfig
             synchronizedSetting: false,
             order: 300,
             categoryOrder: 400);
-        AutoCloseGraceSeconds = plugin.ConfigEntry(
+        AutoCloseGraceSeconds = ConfigEntry(
             "2 - Portal Map",
             "Auto Close Grace Seconds",
             0.5f,
@@ -55,7 +110,7 @@ internal static class PublicPortalConfig
             synchronizedSetting: false,
             order: 200,
             categoryOrder: 400);
-        PortalMapWheelZoomMultiplier = plugin.ConfigEntry(
+        PortalMapWheelZoomMultiplier = ConfigEntry(
             "2 - Portal Map",
             "Portal Map Wheel Zoom Multiplier",
             3,
@@ -65,7 +120,7 @@ internal static class PublicPortalConfig
             synchronizedSetting: false,
             order: 100,
             categoryOrder: 400);
-        FavoritePortalListCollapsed = plugin.ConfigEntry(
+        FavoritePortalListCollapsed = ConfigEntry(
             "2 - Portal Map",
             "Favorite Portal List Collapsed",
             PortalRulesPlugin.Toggle.Off,
@@ -74,7 +129,7 @@ internal static class PublicPortalConfig
             order: 50,
             categoryOrder: 400,
             browsable: false);
-        ToggleAccessKey = plugin.ConfigEntry(
+        ToggleAccessKey = ConfigEntry(
             "3 - Access Modes",
             "Portal Access Modifier Key",
             new KeyboardShortcut(KeyCode.LeftShift),
@@ -83,7 +138,7 @@ internal static class PublicPortalConfig
             order: 600,
             categoryOrder: 300);
 
-        PublicAccessDurationSeconds = plugin.ConfigEntry(
+        PublicAccessDurationSeconds = ConfigEntry(
             "3 - Access Modes",
             "Public Access Duration Seconds",
             900,
@@ -92,7 +147,7 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<int>(0, 604800)),
             order: 500,
             categoryOrder: 300);
-        MaxInvitePortalsPerAccount = plugin.ConfigEntry(
+        MaxInvitePortalsPerAccount = ConfigEntry(
             "3 - Access Modes",
             "Max Invite Portals Per Account",
             1,
@@ -101,7 +156,7 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<int>(-1, 10000)),
             order: 400,
             categoryOrder: 300);
-        InviteDepartureCooldownHours = plugin.ConfigEntry(
+        InviteDepartureCooldownHours = ConfigEntry(
             "3 - Access Modes",
             "Invite Departure Cooldown Hours",
             1f,
@@ -110,7 +165,7 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<float>(0f, 8760f)),
             order: 300,
             categoryOrder: 300);
-        InviteArrivalCooldownHours = plugin.ConfigEntry(
+        InviteArrivalCooldownHours = ConfigEntry(
             "3 - Access Modes",
             "Invite Arrival Cooldown Hours",
             1f,
@@ -119,7 +174,7 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<float>(0f, 8760f)),
             order: 200,
             categoryOrder: 300);
-        MaxClanPortalsPerClan = plugin.ConfigEntry(
+        MaxClanPortalsPerClan = ConfigEntry(
             "3 - Access Modes",
             "Max Clan Portals Per Clan",
             5,
@@ -129,14 +184,14 @@ internal static class PublicPortalConfig
             order: 100,
             categoryOrder: 300);
 
-        EnableAccountPortalLimit = plugin.ConfigEntry(
+        EnableAccountPortalLimit = ConfigEntry(
             "4 - Account Portal Limit",
             "Enable Account Portal Limit",
             PortalRulesPlugin.Toggle.On,
             "If on, the server limits player-built portals by authenticated SteamID64, across all characters on that Steam account. If off, the account limit and every portal_limit override are bypassed; Invite and Clan limits remain active.",
             order: 300,
             categoryOrder: 200);
-        MaxPortalsPerAccount = plugin.ConfigEntry(
+        MaxPortalsPerAccount = ConfigEntry(
             "4 - Account Portal Limit",
             "Max Portals Per Account",
             10,
@@ -145,7 +200,7 @@ internal static class PublicPortalConfig
                 new AcceptableValueRange<int>(-1, 10000)),
             order: 200,
             categoryOrder: 200);
-        CountedPortalPrefabs = plugin.ConfigEntry(
+        CountedPortalPrefabs = ConfigEntry(
             "4 - Account Portal Limit",
             "Counted Portal Prefabs",
             "portal_wood,portal,portal_stone",
@@ -153,14 +208,14 @@ internal static class PublicPortalConfig
             order: 100,
             categoryOrder: 200);
 
-        PortalFareMode = plugin.ConfigEntry(
+        PortalFareMode = ConfigEntry(
             "5 - Portal Travel Costs",
             "Portal Fare Mode",
-            ReadLegacyFareModeDefault(plugin.Config.ConfigFilePath),
+            ReadLegacyFareModeDefault(config.ConfigFilePath),
             "Off keeps Valheim's normal item teleport restrictions. Pay lets ordinary non-teleportable items use a portal for a Coins fare based on their total weight and travel distance. Items with an absolute teleport restriction remain blocked.",
             order: 200,
             categoryOrder: 100);
-        CoinsPerWeightKilometer = plugin.ConfigEntry(
+        CoinsPerWeightKilometer = ConfigEntry(
             "5 - Portal Travel Costs",
             "Coins Per Weight Kilometer",
             0.1f,
@@ -173,7 +228,254 @@ internal static class PublicPortalConfig
         SubscribeToSettingChanges();
     }
 
+    internal static void StartPersistence()
+    {
+        ConfigFile config = _config ??
+            throw new InvalidOperationException(
+                "PortalRules configuration has not been initialized.");
+        config.Save();
+        RememberCurrentConfigFingerprint();
+        config.SettingChanged += OnConfigSettingChanged;
+        _configPersistenceActive = true;
+        SetupWatcher();
+    }
+
+    internal static void Tick()
+    {
+        float now = Time.realtimeSinceStartup;
+        if (_configReloadPending && now >= _configReloadAt)
+        {
+            ReloadConfigIfChanged(now);
+        }
+
+        if (_configSavePending && now >= _configSaveAt)
+        {
+            SaveConfigNow();
+        }
+    }
+
     internal static void Shutdown()
+    {
+        try
+        {
+            ShutdownConfigPersistence();
+        }
+        finally
+        {
+            try
+            {
+                UnsubscribeFromSettingChanges();
+            }
+            finally
+            {
+                if (_configurationInitialized && _config != null)
+                {
+                    _config.SaveOnConfigSet = _originalSaveOnConfigSet;
+                }
+
+                _configurationInitialized = false;
+                _config = null;
+                _configSavePending = false;
+                _configReloadPending = false;
+                _processingConfigReload = false;
+                _knownConfigFingerprint = "";
+            }
+        }
+    }
+
+    private static void SetupWatcher()
+    {
+        _watcher = new FileSystemWatcher(Paths.ConfigPath, ConfigFileName);
+        _watcher.Changed += ReadConfigValues;
+        _watcher.Created += ReadConfigValues;
+        _watcher.Renamed += ReadConfigValues;
+        _watcher.SynchronizingObject = ThreadingHelper.SynchronizingObject;
+        _watcher.EnableRaisingEvents = true;
+    }
+
+    private static void ReadConfigValues(
+        object sender,
+        FileSystemEventArgs args)
+    {
+        if (!_configPersistenceActive)
+        {
+            return;
+        }
+
+        _configReloadPending = true;
+        _configReloadAt =
+            Time.realtimeSinceStartup + ConfigReloadDebounceSeconds;
+    }
+
+    private static void OnConfigSettingChanged(
+        object sender,
+        SettingChangedEventArgs args)
+    {
+        if (!_configPersistenceActive ||
+            _processingConfigReload ||
+            ConfigSync.ProcessingServerUpdate)
+        {
+            return;
+        }
+
+        _configSavePending = true;
+        _configSaveAt =
+            Time.realtimeSinceStartup + ConfigSaveDebounceSeconds;
+    }
+
+    private static void ReloadConfigIfChanged(float now)
+    {
+        ConfigFile? config = _config;
+        if (config == null)
+        {
+            _configReloadPending = false;
+            return;
+        }
+
+        if (!File.Exists(ConfigFileFullPath))
+        {
+            _configReloadPending = false;
+            PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                "Config file does not exist. Skipping reload.");
+            return;
+        }
+
+        if (!TryGetConfigFingerprint(out string fingerprint))
+        {
+            _configReloadAt = now + ConfigIoRetrySeconds;
+            return;
+        }
+
+        _configReloadPending = false;
+        if (string.Equals(
+                fingerprint,
+                _knownConfigFingerprint,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            PortalRulesPlugin.PortalRulesLogger.LogDebug(
+                "Reloading configuration...");
+            _processingConfigReload = true;
+            config.Reload();
+            _configSavePending = false;
+            _knownConfigFingerprint =
+                TryGetConfigFingerprint(out string reloadedFingerprint)
+                    ? reloadedFingerprint
+                    : fingerprint;
+            PortalRulesPlugin.PortalRulesLogger.LogInfo(
+                "Configuration reload complete.");
+        }
+        catch (Exception ex)
+        {
+            _configReloadPending = true;
+            _configReloadAt = now + ConfigIoRetrySeconds;
+            PortalRulesPlugin.PortalRulesLogger.LogError(
+                $"Error reloading configuration: {ex.Message}");
+        }
+        finally
+        {
+            _processingConfigReload = false;
+        }
+    }
+
+    private static void SaveConfigNow()
+    {
+        ConfigFile? config = _config;
+        if (config == null)
+        {
+            _configSavePending = false;
+            return;
+        }
+
+        try
+        {
+            config.Save();
+            _configSavePending = false;
+            RememberCurrentConfigFingerprint();
+        }
+        catch (Exception ex)
+        {
+            _configSavePending = true;
+            _configSaveAt =
+                Time.realtimeSinceStartup + ConfigIoRetrySeconds;
+            PortalRulesPlugin.PortalRulesLogger.LogError(
+                $"Error saving configuration: {ex.Message}");
+        }
+    }
+
+    private static void RememberCurrentConfigFingerprint()
+    {
+        if (TryGetConfigFingerprint(out string fingerprint))
+        {
+            _knownConfigFingerprint = fingerprint;
+        }
+    }
+
+    private static bool TryGetConfigFingerprint(out string fingerprint)
+    {
+        fingerprint = "";
+        try
+        {
+            using FileStream stream = new(
+                ConfigFileFullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using SHA256 sha256 = SHA256.Create();
+            fingerprint = Convert.ToBase64String(
+                sha256.ComputeHash(stream));
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static void ShutdownConfigPersistence()
+    {
+        try
+        {
+            if (_watcher != null)
+            {
+                _watcher.EnableRaisingEvents = false;
+                _watcher.Dispose();
+                _watcher = null;
+            }
+        }
+        finally
+        {
+            if (_configPersistenceActive)
+            {
+                if (_config != null)
+                {
+                    _config.SettingChanged -= OnConfigSettingChanged;
+                }
+
+                try
+                {
+                    if (_configSavePending)
+                    {
+                        SaveConfigNow();
+                    }
+                }
+                finally
+                {
+                    _configPersistenceActive = false;
+                }
+            }
+        }
+    }
+
+    private static void UnsubscribeFromSettingChanges()
     {
         if (!_settingHandlersRegistered)
         {
@@ -227,7 +529,7 @@ internal static class PublicPortalConfig
         }
         catch
         {
-            Shutdown();
+            UnsubscribeFromSettingChanges();
             throw;
         }
     }
@@ -258,6 +560,81 @@ internal static class PublicPortalConfig
         EventArgs args)
     {
         PublicPortalServerPolicy.NotifyQuotaConfigurationChanged();
+    }
+
+    private static ConfigEntry<T> ConfigEntry<T>(
+        string group,
+        string name,
+        T value,
+        ConfigDescription description,
+        bool synchronizedSetting = true,
+        int? order = null,
+        int? categoryOrder = null,
+        bool? browsable = null)
+    {
+        object[] tags = description.Tags ?? Array.Empty<object>();
+        if (order.HasValue || categoryOrder.HasValue || browsable.HasValue)
+        {
+            tags = tags
+                .Concat(new object[]
+                {
+                    new ConfigurationManagerAttributes
+                    {
+                        Order = order,
+                        CategoryOrder = categoryOrder,
+                        Browsable = browsable
+                    }
+                })
+                .ToArray();
+        }
+
+        ConfigDescription extendedDescription = new(
+            description.Description +
+            (synchronizedSetting
+                ? " [Synced with Server]"
+                : " [Not Synced with Server]"),
+            description.AcceptableValues,
+            tags);
+        ConfigFile config = _config ??
+            throw new InvalidOperationException(
+                "PortalRules configuration has not been initialized.");
+        ConfigEntry<T> configEntry =
+            config.Bind(group, name, value, extendedDescription);
+        SyncedConfigEntry<T> syncedConfigEntry =
+            ConfigSync.AddConfigEntry(configEntry);
+        syncedConfigEntry.SynchronizedConfig = synchronizedSetting;
+
+        return configEntry;
+    }
+
+    private static ConfigEntry<T> ConfigEntry<T>(
+        string group,
+        string name,
+        T value,
+        string description,
+        bool synchronizedSetting = true,
+        int? order = null,
+        int? categoryOrder = null,
+        bool? browsable = null)
+    {
+        return ConfigEntry(
+            group,
+            name,
+            value,
+            new ConfigDescription(description),
+            synchronizedSetting,
+            order,
+            categoryOrder,
+            browsable);
+    }
+
+    private sealed class ConfigurationManagerAttributes
+    {
+        public int? Order { get; set; }
+
+        public int? CategoryOrder { get; set; }
+
+        public bool? Browsable { get; set; }
     }
 
     private static PublicPortalFareMode ReadLegacyFareModeDefault(

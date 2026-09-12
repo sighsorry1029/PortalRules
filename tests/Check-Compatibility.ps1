@@ -146,7 +146,8 @@ try {
         if ($hasMin -and $hasMax -and $hasClamp) { $wheelMatches++ }
     }
     if ($wheelMatches -ne 1) { $failures.Add("Unexpected wheel transpiler anchor count: $wheelMatches") }
-    $pluginType = $module.Types | Where-Object FullName -eq 'PortalRules.PortalRulesPlugin'
+    $portalConfigType = $module.Types |
+        Where-Object FullName -eq 'PortalRules.PublicPortalConfig'
     function Method-Calls($method, [string]$declaringType, [string]$name) {
         @($method.Body.Instructions | Where-Object {
             $_.Operand -is [Mono.Cecil.MethodReference] -and
@@ -154,10 +155,10 @@ try {
             $_.Operand.Name -eq $name
         }).Count
     }
-    $fileChanged = $pluginType.Methods | Where-Object Name -eq 'ReadConfigValues'
-    $reloadConfig = $pluginType.Methods | Where-Object Name -eq 'ReloadConfigIfChanged'
-    $saveConfig = $pluginType.Methods | Where-Object Name -eq 'SaveConfigNow'
-    $settingChanged = $pluginType.Methods | Where-Object Name -eq 'OnConfigSettingChanged'
+    $fileChanged = $portalConfigType.Methods | Where-Object Name -eq 'ReadConfigValues'
+    $reloadConfig = $portalConfigType.Methods | Where-Object Name -eq 'ReloadConfigIfChanged'
+    $saveConfig = $portalConfigType.Methods | Where-Object Name -eq 'SaveConfigNow'
+    $settingChanged = $portalConfigType.Methods | Where-Object Name -eq 'OnConfigSettingChanged'
     if (!$fileChanged -or !$reloadConfig -or !$saveConfig -or !$settingChanged) {
         $failures.Add('Config persistence methods are missing')
     }
@@ -183,17 +184,15 @@ try {
             $failures.Add('Config save debounce does not distinguish ServerSync updates')
         }
     }
-    $portalConfigType = $module.Types |
-        Where-Object FullName -eq 'PortalRules.PublicPortalConfig'
     $subscribeSettings = $portalConfigType.Methods |
         Where-Object Name -eq 'SubscribeToSettingChanges'
-    $shutdownSettings = $portalConfigType.Methods |
-        Where-Object Name -eq 'Shutdown'
+    $unsubscribeSettings = $portalConfigType.Methods |
+        Where-Object Name -eq 'UnsubscribeFromSettingChanges'
     $settingAdds = @($subscribeSettings.Body.Instructions | Where-Object {
         $_.Operand -is [Mono.Cecil.MethodReference] -and
         $_.Operand.Name -eq 'add_SettingChanged'
     }).Count
-    $settingRemoves = @($shutdownSettings.Body.Instructions | Where-Object {
+    $settingRemoves = @($unsubscribeSettings.Body.Instructions | Where-Object {
         $_.Operand -is [Mono.Cecil.MethodReference] -and
         $_.Operand.Name -eq 'remove_SettingChanged'
     }).Count
