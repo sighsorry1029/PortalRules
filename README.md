@@ -6,7 +6,7 @@ The server filters the portal catalog for each player and authorizes every handl
 
 This source targets Valheim 1.0.7 and BepInExPack Valheim 5.4.2350. Jotunn is no longer required by PortalRules. Other installed mods may still require it. Install PortalRules on the server and clients; its existing ServerSync configuration/version checks remain in place.
 
-All-items portals bypass ordinary material restrictions, while respecting Valheim's absolute item restrictions. Blocked travel is rejected before opening the destination map. Implementation details and the remaining in-game validation checklist are in [the 1.0.7 compatibility notes](docs/valheim-1.0.7.md).
+All-items portals bypass ordinary material restrictions while respecting Valheim's absolute item restrictions. In Off mode, restricted cargo is rejected before the destination map opens. In Pay mode, ordinary restricted cargo opens the map and is charged by weight and distance; absolute restrictions are still rejected. Compatibility details and the remaining in-game validation checklist are in [the 1.0.7 notes](docs/valheim-1.0.7.md).
 
 ## Showcase
 
@@ -95,7 +95,7 @@ Adjust the position and rotation for each location. Editing the YAML does not mo
 
 When `Enable Portal Map` is On, enter a handled non-Tagged portal to open the destination map. Select an accessible portal pin to travel.
 
-If the source portal does not allow all items, carrying a non-teleportable item shows Valheim's item restriction message without opening the map. Portals that allow every item show **All Items Teleportable** above their hover details.
+With `Portal Fare Mode` set to `Off`, a restricted source carrying a non-teleportable item shows Valheim's item restriction message without opening the map. In `Pay` mode, ordinary restricted cargo opens the map and shows its fare; absolutely restricted items remain blocked. Portals that allow every item show **All Items Teleportable** above their hover details.
 
 The arrow beside **Favorite Portals** collapses the list. Its state is saved locally.
 
@@ -172,19 +172,19 @@ Use physical `Alt + Interact` to set or clear a Required GlobalKey. Without YouA
 ## Coins fares
 
 ```text
-fare = Base Coin Cost
-     + ceil(Coins Per Kilometer × max(0, XZ distance − included distance) / 1000)
+fare = ceil(non-teleportable cargo weight
+          × XZ distance in kilometers
+          × Coins Per Weight Kilometer)
 ```
 
-| Scope | Charged trips |
+| Mode | Behavior |
 |---|---|
-| `Off` | None. |
-| `All` | Every handled trip. |
-| `AdminPortalTrips` | Either endpoint is an Admin portal prefab, regardless of access mode. |
-| `PersonalAndClanRoutesFree` | Every trip except one whose two endpoints are both Personal or Clan. |
-| `AllItemsSourceTrips` | The source portal allows every item; the destination capability is ignored. |
+| `Off` | Valheim's normal item teleport restrictions apply. |
+| `Pay` | Ordinary non-teleportable items may travel from a restricted portal for the calculated fare. |
 
-The server calculates the route and final fare. Denied trips and teleports that fail to start do not consume Coins. Carried-item restrictions always follow the source portal's own item rule.
+In Pay mode, a restricted source portal keeps its whirling effect active for payable cargo and opens the destination map. Map pins and favorite rows show the calculated fare. Tagged portals keep direct connected travel and show the same fare in the connected hover badge. All-items portals and the `TeleportAll` world modifier remain free because they already allow the cargo.
+
+The server calculates the route and final fare from the client cargo-weight snapshot, and the client verifies that exact weight again before taking Coins and starting the teleport. Denied trips and teleports that fail to start do not consume Coins. Valheim 1.0's absolute item restrictions remain blocked in both modes.
 
 ## Server files
 

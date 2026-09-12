@@ -43,6 +43,30 @@ internal static class PublicPortalMap
         return clamped * multiplier;
     }
 
+    private static bool HasWhirlingTarget(TeleportWorld portal)
+    {
+        if (IsMapSelectionPortal(portal))
+        {
+            return true;
+        }
+
+        ZDO? sourceZdo = PublicPortalKinds.GetPortalZdo(portal);
+        ZDOID targetId = sourceZdo?.GetConnectionZDOID(
+            ZDOExtraData.ConnectionType.Portal) ?? ZDOID.None;
+        if (targetId.IsNone() || ZDOMan.instance == null)
+        {
+            return false;
+        }
+
+        if (ZDOMan.instance.GetZDO(targetId) != null)
+        {
+            return true;
+        }
+
+        ZDOMan.instance.RequestZDO(targetId);
+        return false;
+    }
+
     [HarmonyPatch(typeof(Minimap), "UpdateMap")]
     private static class PortalMapWheelZoomPatch
     {
@@ -164,6 +188,42 @@ internal static class PublicPortalMap
 
             __result = true;
             return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(TeleportWorld), "UpdatePortal")]
+    private static class PayableCargoWhirlingEffectPatch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(TeleportWorld __instance)
+        {
+            if (!PublicPortalTravelCost.IsEnabled ||
+                __instance == null ||
+                __instance.m_allowAllItems ||
+                __instance.m_target_found == null)
+            {
+                return;
+            }
+
+            Transform proximityRoot = __instance.m_proximityRoot != null
+                ? __instance.m_proximityRoot
+                : __instance.transform;
+            float activationRange = Mathf.Max(
+                0f,
+                __instance.m_activationRange);
+            Player? nearbyPlayer = Player.GetClosestPlayer(
+                proximityRoot.position,
+                activationRange);
+            if (nearbyPlayer != null &&
+                PublicPortalTravelCost.TryGetCargoWeightUnits(
+                    nearbyPlayer,
+                    sourceAllowsAllItems: false,
+                    out int cargoWeightUnits) &&
+                cargoWeightUnits > 0 &&
+                HasWhirlingTarget(__instance))
+            {
+                __instance.m_target_found.SetActive(true);
+            }
         }
     }
 

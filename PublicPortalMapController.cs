@@ -96,15 +96,10 @@ internal sealed class PublicPortalMapController
         }
 
         PublicPortalTeleportService.CancelPending();
-        if (!PublicPortalTeleportService.CanTeleportWithItems(sourcePortal.m_allowAllItems))
-        {
-            Player.m_localPlayer.Message(MessageHud.MessageType.Center, "$msg_noteleport");
-            return;
-        }
-
         ZDOID sourcePortalId = sourceZdo.m_uid;
         PublicPortalTeleportService.AuthorizeMapOpen(
             sourcePortalId,
+            sourcePortal.m_allowAllItems,
             () => BeginAuthorized(
                 sourcePortalId,
                 sourcePortal,

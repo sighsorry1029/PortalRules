@@ -63,6 +63,7 @@ internal readonly struct PortalTravelAuthorization
     internal readonly Vector3 TargetPosition;
     internal readonly Quaternion TargetRotation;
     internal readonly int CoinCost;
+    internal readonly int CargoWeightUnits;
     internal readonly string AccountId;
     internal readonly string SourceFavoriteId;
     internal readonly string DestinationFavoriteId;
@@ -74,6 +75,7 @@ internal readonly struct PortalTravelAuthorization
         Vector3 targetPosition,
         Quaternion targetRotation,
         int coinCost,
+        int cargoWeightUnits,
         string accountId,
         string sourceFavoriteId,
         string destinationFavoriteId,
@@ -84,6 +86,11 @@ internal readonly struct PortalTravelAuthorization
         TargetPosition = targetPosition;
         TargetRotation = targetRotation;
         CoinCost = Math.Max(0, coinCost);
+        CargoWeightUnits = Math.Max(
+            0,
+            Math.Min(
+                cargoWeightUnits,
+                PublicPortalTravelCost.MaximumCargoWeightUnits));
         AccountId = accountId ?? "";
         SourceFavoriteId = sourceFavoriteId ?? "";
         DestinationFavoriteId = destinationFavoriteId ?? "";
@@ -114,6 +121,7 @@ internal static partial class PublicPortalTeleportService
         internal readonly Vector3 TargetPosition;
         internal readonly Quaternion TargetRotation;
         internal readonly int CoinCost;
+        internal readonly int CargoWeightUnits;
         internal readonly string Ticket;
         internal readonly PortalTravelDenial Denial;
 
@@ -125,6 +133,7 @@ internal static partial class PublicPortalTeleportService
             Vector3 targetPosition,
             Quaternion targetRotation,
             int coinCost,
+            int cargoWeightUnits,
             string ticket,
             PortalTravelDenial denial)
         {
@@ -135,6 +144,7 @@ internal static partial class PublicPortalTeleportService
             TargetPosition = targetPosition;
             TargetRotation = targetRotation;
             CoinCost = coinCost;
+            CargoWeightUnits = cargoWeightUnits;
             Ticket = ticket ?? "";
             Denial = denial;
         }
@@ -148,6 +158,7 @@ internal static partial class PublicPortalTeleportService
             package.Write(TargetPosition);
             package.Write(TargetRotation);
             package.Write(CoinCost);
+            package.Write(CargoWeightUnits);
             package.Write(Ticket);
             package.Write((int)Denial.Code);
             package.Write(Denial.Argument);
@@ -171,6 +182,14 @@ internal static partial class PublicPortalTeleportService
             Vector3 position = package.ReadVector3();
             Quaternion rotation = package.ReadQuaternion();
             int coinCost = package.ReadInt();
+            int cargoWeightUnits = package.ReadInt();
+            if (cargoWeightUnits < 0 ||
+                cargoWeightUnits >
+                PublicPortalTravelCost.MaximumCargoWeightUnits)
+            {
+                throw new InvalidOperationException(
+                    "Portal travel grant contained invalid cargo weight.");
+            }
             string ticket = package.ReadString();
             if (ticket.Length != 0 && !IsValidTicket(ticket))
             {
@@ -202,6 +221,7 @@ internal static partial class PublicPortalTeleportService
                 position,
                 rotation,
                 coinCost,
+                cargoWeightUnits,
                 ticket,
                 denial);
         }
@@ -214,6 +234,7 @@ internal static partial class PublicPortalTeleportService
         public readonly ZDOID TargetId;
         public readonly TeleportRequestKind Kind;
         public readonly bool SourceAllowsAllItems;
+        public readonly int CargoWeightUnits;
         public readonly float ExitDistance;
         public readonly float StartedAt;
         public readonly Action? CompletionAction;
@@ -224,6 +245,7 @@ internal static partial class PublicPortalTeleportService
             ZDOID targetId,
             TeleportRequestKind kind,
             bool sourceAllowsAllItems,
+            int cargoWeightUnits,
             float exitDistance,
             float startedAt,
             Action? completionAction)
@@ -233,6 +255,7 @@ internal static partial class PublicPortalTeleportService
             TargetId = targetId;
             Kind = kind;
             SourceAllowsAllItems = sourceAllowsAllItems;
+            CargoWeightUnits = cargoWeightUnits;
             ExitDistance = exitDistance;
             StartedAt = startedAt;
             CompletionAction = completionAction;
@@ -240,9 +263,9 @@ internal static partial class PublicPortalTeleportService
     }
 
     private const string TeleportRequestRpc =
-        "sighsorry.PortalRules.TeleportRequest.v4";
+        "sighsorry.PortalRules.TeleportRequest.v5";
     private const string TeleportGrantRpc =
-        "sighsorry.PortalRules.TeleportGrant.v4";
+        "sighsorry.PortalRules.TeleportGrant.v5";
     private const float RequestCooldownSeconds = 0.25f;
     private const float PendingRequestTimeoutSeconds = 5f;
     private const int MaximumRequestPackageBytes = 256;
@@ -376,6 +399,7 @@ internal static partial class PublicPortalTeleportService
 
     internal static void AuthorizeMapOpen(
         ZDOID sourcePortalId,
+        bool sourceAllowsAllItems,
         Action openMap)
     {
         if (sourcePortalId.IsNone() || openMap == null)
@@ -387,7 +411,7 @@ internal static partial class PublicPortalTeleportService
             TeleportRequestKind.MapOpen,
             sourcePortalId,
             ZDOID.None,
-            sourceAllowsAllItems: false,
+            sourceAllowsAllItems,
             exitDistance: 0f,
             openMap);
     }
@@ -446,8 +470,10 @@ internal static partial class PublicPortalTeleportService
             return;
         }
 
-        if (kind != TeleportRequestKind.MapOpen &&
-            !CanTeleportWithItems(sourceAllowsAllItems))
+        if (!PublicPortalTravelCost.TryGetLocalCargoWeightUnits(
+                sourceAllowsAllItems,
+                out int cargoWeightUnits,
+                forceRefresh: true))
         {
             player.Message(MessageHud.MessageType.Center, "$msg_noteleport");
             return;
@@ -470,8 +496,10 @@ internal static partial class PublicPortalTeleportService
                 out PublicPortalCatalogEntry targetEntry))
         {
             int expectedCoinCost = PublicPortalTravelCost.CalculateCost(
-                sourceEntry,
-                targetEntry);
+                sourceEntry.AllowsAllItems,
+                sourceEntry.Position,
+                targetEntry.Position,
+                cargoWeightUnits);
             if (expectedCoinCost > 0 &&
                 !PortalCoinWallet.HasLocalCoins(expectedCoinCost))
             {
@@ -505,6 +533,7 @@ internal static partial class PublicPortalTeleportService
                 sourcePortalId,
                 targetPortalId,
                 ticket,
+                cargoWeightUnits,
                 out PortalTravelAuthorization authorization,
                 out PortalTravelDenial denial);
 
@@ -544,6 +573,7 @@ internal static partial class PublicPortalTeleportService
                 authorization.TargetRotation,
                 exitDistance,
                 authorization.CoinCost,
+                authorization.CargoWeightUnits,
                 kind,
                 sourceAllowsAllItems,
                 endSelection);
@@ -580,6 +610,7 @@ internal static partial class PublicPortalTeleportService
             targetPortalId,
             kind,
             sourceAllowsAllItems,
+            cargoWeightUnits,
             exitDistance,
             Time.realtimeSinceStartup,
             endSelection);
@@ -589,6 +620,7 @@ internal static partial class PublicPortalTeleportService
         request.Write((int)kind);
         request.Write(sourcePortalId);
         request.Write(targetPortalId);
+        request.Write(cargoWeightUnits);
         serverRpc.Invoke(TeleportRequestRpc, request);
     }
 
@@ -598,6 +630,7 @@ internal static partial class PublicPortalTeleportService
         ZDOID sourcePortalId,
         ZDOID targetPortalId,
         string ticket,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -628,6 +661,7 @@ internal static partial class PublicPortalTeleportService
                     sourcePortalId,
                     targetPortalId,
                     ticket,
+                    cargoWeightUnits,
                     out authorization,
                     out denial)
                 : PublicPortalCatalog.TryAuthorizeConnectedTeleport(
@@ -635,23 +669,26 @@ internal static partial class PublicPortalTeleportService
                     sourcePortalId,
                     targetPortalId,
                     ticket,
+                    cargoWeightUnits,
                     out authorization,
                     out denial);
         }
 
         return peer == null
             ? PublicPortalCatalog.TryAuthorizeLocalTeleport(
-                sourcePortalId,
-                targetPortalId,
-                ticket,
-                out authorization,
+            sourcePortalId,
+            targetPortalId,
+            ticket,
+            cargoWeightUnits,
+            out authorization,
                 out denial)
             : PublicPortalCatalog.TryAuthorizeTeleport(
                 peer,
-                sourcePortalId,
-                targetPortalId,
-                ticket,
-                out authorization,
+            sourcePortalId,
+            targetPortalId,
+            ticket,
+            cargoWeightUnits,
+            out authorization,
                 out denial);
     }
 
@@ -685,6 +722,7 @@ internal static partial class PublicPortalTeleportService
         TeleportRequestKind kind;
         ZDOID sourcePortalId;
         ZDOID targetPortalId;
+        int cargoWeightUnits;
         try
         {
             requestId = package.ReadLong();
@@ -698,10 +736,14 @@ internal static partial class PublicPortalTeleportService
             kind = (TeleportRequestKind)rawKind;
             sourcePortalId = package.ReadZDOID();
             targetPortalId = package.ReadZDOID();
-            if (requestId <= 0L)
+            cargoWeightUnits = package.ReadInt();
+            if (requestId <= 0L ||
+                cargoWeightUnits < 0 ||
+                cargoWeightUnits >
+                PublicPortalTravelCost.MaximumCargoWeightUnits)
             {
                 throw new InvalidOperationException(
-                    "Portal travel request IDs must be positive.");
+                    "Portal travel request ID or cargo weight is invalid.");
             }
         }
         catch (Exception ex)
@@ -730,6 +772,7 @@ internal static partial class PublicPortalTeleportService
                 kind,
                 false,
                 targetPortalId,
+                cargoWeightUnits,
                 authorization,
                 "",
                 new PortalTravelDenial(
@@ -751,6 +794,7 @@ internal static partial class PublicPortalTeleportService
                 sourcePortalId,
                 targetPortalId,
                 ticket,
+                cargoWeightUnits,
                 out authorization,
                 out denial);
         }
@@ -789,6 +833,7 @@ internal static partial class PublicPortalTeleportService
             kind,
             success,
             targetPortalId,
+            cargoWeightUnits,
             authorization,
             ticket,
             denial);
@@ -819,6 +864,7 @@ internal static partial class PublicPortalTeleportService
         TeleportRequestKind kind,
         bool success,
         ZDOID targetPortalId,
+        int cargoWeightUnits,
         PortalTravelAuthorization authorization,
         string ticket,
         PortalTravelDenial denial)
@@ -831,6 +877,7 @@ internal static partial class PublicPortalTeleportService
             authorization.TargetPosition,
             authorization.TargetRotation,
             authorization.CoinCost,
+            cargoWeightUnits,
             ticket,
             denial);
         ZPackage response = new();
@@ -908,11 +955,13 @@ internal static partial class PublicPortalTeleportService
         }
 
         bool sourceAllowsAllItems = pendingRequest.SourceAllowsAllItems;
+        int requestedCargoWeightUnits = pendingRequest.CargoWeightUnits;
         ZDOID sourcePortalId = pendingRequest.SourceId;
         float exitDistance = pendingRequest.ExitDistance;
         Action? completionAction = pendingRequest.CompletionAction;
         CancelPending();
         if (!payload.Success || payload.CoinCost < 0 ||
+            payload.CargoWeightUnits != requestedCargoWeightUnits ||
             payload.Kind == TeleportRequestKind.MapOpen && payload.Ticket.Length != 0 ||
             payload.Kind != TeleportRequestKind.MapOpen &&
             payload.CoinCost > 0 && payload.Ticket.Length == 0)
@@ -946,6 +995,7 @@ internal static partial class PublicPortalTeleportService
             payload.TargetRotation,
             exitDistance,
             payload.CoinCost,
+            payload.CargoWeightUnits,
             payload.Kind,
             sourceAllowsAllItems,
             completionAction);
@@ -1097,15 +1147,28 @@ internal static partial class PublicPortalTeleportService
         Quaternion targetRotation,
         float exitDistance,
         int coinCost,
+        int authorizedCargoWeightUnits,
         TeleportRequestKind kind,
         bool sourceAllowsAllItems,
         Action? endSelection)
     {
         Player? player = Player.m_localPlayer;
         if (player == null ||
-            !CanTeleportWithItems(sourceAllowsAllItems))
+            !PublicPortalTravelCost.TryGetLocalCargoWeightUnits(
+                sourceAllowsAllItems,
+                out int currentCargoWeightUnits,
+                forceRefresh: true))
         {
             player?.Message(MessageHud.MessageType.Center, "$msg_noteleport");
+            return false;
+        }
+
+        if (currentCargoWeightUnits != authorizedCargoWeightUnits)
+        {
+            player.Message(
+                MessageHud.MessageType.Center,
+                PortalRulesLocalization.Translate(
+                    "$sighsorry_portalrules_cargo_changed"));
             return false;
         }
 
@@ -1286,13 +1349,9 @@ internal static partial class PublicPortalTeleportService
 
     internal static bool CanTeleportWithItems(bool sourceAllowsAllItems)
     {
-        Player? player = Player.m_localPlayer;
-        if (player == null)
-        {
-            return false;
-        }
-
-        return player.IsTeleportable(sourceAllowsAllItems);
+        return PublicPortalTravelCost.TryGetLocalCargoWeightUnits(
+            sourceAllowsAllItems,
+            out _);
     }
 
     private static long NextRequestId()

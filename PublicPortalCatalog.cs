@@ -752,6 +752,7 @@ internal static partial class PublicPortalCatalog
         ZDOID sourcePortalId,
         ZDOID targetPortalId,
         string reservationId,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -772,6 +773,7 @@ internal static partial class PublicPortalCatalog
             targetPortalId,
             requireConnectedPortal: false,
             reservationId,
+            cargoWeightUnits,
             out authorization,
             out denial);
     }
@@ -780,6 +782,7 @@ internal static partial class PublicPortalCatalog
         ZDOID sourcePortalId,
         ZDOID targetPortalId,
         string reservationId,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -793,6 +796,7 @@ internal static partial class PublicPortalCatalog
             targetPortalId,
             requireConnectedPortal: false,
             reservationId,
+            cargoWeightUnits,
             out authorization,
             out denial);
     }
@@ -802,6 +806,7 @@ internal static partial class PublicPortalCatalog
         ZDOID sourcePortalId,
         ZDOID targetPortalId,
         string reservationId,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -822,6 +827,7 @@ internal static partial class PublicPortalCatalog
             targetPortalId,
             requireConnectedPortal: true,
             reservationId,
+            cargoWeightUnits,
             out authorization,
             out denial);
     }
@@ -830,6 +836,7 @@ internal static partial class PublicPortalCatalog
         ZDOID sourcePortalId,
         ZDOID targetPortalId,
         string reservationId,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -843,6 +850,7 @@ internal static partial class PublicPortalCatalog
             targetPortalId,
             requireConnectedPortal: true,
             reservationId,
+            cargoWeightUnits,
             out authorization,
             out denial);
     }
@@ -2892,6 +2900,7 @@ internal static partial class PublicPortalCatalog
         ZDOID targetPortalId,
         bool requireConnectedPortal,
         string reservationId,
+        int cargoWeightUnits,
         out PortalTravelAuthorization authorization,
         out PortalTravelDenial denial)
     {
@@ -2975,13 +2984,10 @@ internal static partial class PublicPortalCatalog
 
         targetRotation = normalizedTargetRotation;
         int coinCost = PublicPortalTravelCost.CalculateCost(
-            sourceAuthority.PrefabHash,
-            sourceAuthority.AccessMode,
             PublicPortalKinds.PrefabAllowsAllItems(sourceAuthority.PrefabHash),
             sourcePosition,
-            targetAuthority.PrefabHash,
-            targetAuthority.AccessMode,
-            targetPosition);
+            targetPosition,
+            cargoWeightUnits);
         bool inviteSource =
             sourceAuthority.AccessMode == PublicPortalAccessMode.Invite;
         bool inviteDestination =
@@ -3012,6 +3018,7 @@ internal static partial class PublicPortalCatalog
             targetPosition,
             targetRotation,
             coinCost,
+            cargoWeightUnits,
             recipient.OwnerId,
             sourceAuthority.FavoriteId,
             targetAuthority.FavoriteId,

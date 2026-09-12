@@ -45,21 +45,26 @@ internal sealed class PublicPortalFavoritePanel
 
     private readonly struct FavoriteFareState : IEquatable<FavoriteFareState>
     {
-        private readonly PublicPortalTravelCostScope _scope;
-        private readonly int _baseCoinCost;
-        private readonly float _includedDistanceMeters;
-        private readonly float _coinsPerKilometer;
+        private readonly PublicPortalFareMode _mode;
+        private readonly float _coinsPerWeightKilometer;
+        private readonly int _cargoWeightUnits;
         private readonly string _inviteCooldownState;
 
         internal readonly int LocalCoinCount;
 
-        internal FavoriteFareState(string inviteCooldownState)
+        internal FavoriteFareState(
+            string inviteCooldownState,
+            bool sourceAllowsAllItems)
         {
-            _scope = PublicPortalConfig.TravelCostScope.Value;
-            _baseCoinCost = PublicPortalConfig.BaseCoinCost.Value;
-            _includedDistanceMeters =
-                PublicPortalConfig.BaseFareIncludedDistanceMeters.Value;
-            _coinsPerKilometer = PublicPortalConfig.CoinsPerKilometer.Value;
+            _mode = PublicPortalConfig.PortalFareMode.Value;
+            _coinsPerWeightKilometer =
+                PublicPortalConfig.CoinsPerWeightKilometer.Value;
+            _cargoWeightUnits =
+                PublicPortalTravelCost.TryGetLocalCargoWeightUnits(
+                    sourceAllowsAllItems,
+                    out int cargoWeightUnits)
+                    ? cargoWeightUnits
+                    : -1;
             LocalCoinCount = PublicPortalTravelCost.IsEnabled
                 ? PortalCoinWallet.GetLocalCoinCount()
                 : 0;
@@ -68,10 +73,9 @@ internal sealed class PublicPortalFavoritePanel
 
         public bool Equals(FavoriteFareState other)
         {
-            return _scope == other._scope &&
-                   _baseCoinCost == other._baseCoinCost &&
-                   _includedDistanceMeters.Equals(other._includedDistanceMeters) &&
-                   _coinsPerKilometer.Equals(other._coinsPerKilometer) &&
+            return _mode == other._mode &&
+                   _coinsPerWeightKilometer.Equals(other._coinsPerWeightKilometer) &&
+                   _cargoWeightUnits == other._cargoWeightUnits &&
                    LocalCoinCount == other.LocalCoinCount &&
                    string.Equals(
                        _inviteCooldownState,
@@ -137,7 +141,7 @@ internal sealed class PublicPortalFavoritePanel
         }
 
         FavoriteFareState fareState = capturedFareState ??
-            CaptureFavoriteFareState(activePortals);
+            CaptureFavoriteFareState(sourcePortal, activePortals);
         _fareState = fareState;
         List<string> favoriteIds = PublicPortalData.ReadFavorites();
         Dictionary<string, PublicPortalCatalogEntry> portalsByFavoriteId =
@@ -233,7 +237,7 @@ internal sealed class PublicPortalFavoritePanel
 
         _nextFareStateCheckAt = now + FareStateCheckIntervalSeconds;
         FavoriteFareState currentState =
-            CaptureFavoriteFareState(activePortals);
+            CaptureFavoriteFareState(sourcePortal, activePortals);
         if (!_fareState.HasValue)
         {
             _fareState = currentState;
@@ -255,6 +259,7 @@ internal sealed class PublicPortalFavoritePanel
     }
 
     private static FavoriteFareState CaptureFavoriteFareState(
+        PublicPortalCatalogEntry? sourcePortal,
         IEnumerable<PublicPortalCatalogEntry> activePortals)
     {
         List<string> favoriteIds = PublicPortalData.ReadFavorites();
@@ -272,7 +277,9 @@ internal sealed class PublicPortalFavoritePanel
                         ? $"{portal.FavoriteId}:" +
                           InviteTravelCooldownStore.FormatRemaining(remainingSeconds)
                         : $"{portal.FavoriteId}:-"));
-        return new FavoriteFareState(inviteCooldownState);
+        return new FavoriteFareState(
+            inviteCooldownState,
+            sourcePortal?.AllowsAllItems ?? false);
     }
 
     public void Destroy()

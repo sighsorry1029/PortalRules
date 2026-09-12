@@ -18,13 +18,10 @@ internal enum PublicPortalAccessMode
     Invite = 5
 }
 
-internal enum PublicPortalTravelCostScope
+internal enum PublicPortalFareMode
 {
     Off = 0,
-    All = 1,
-    AdminPortalTrips = 2,
-    PersonalAndClanRoutesFree = 3,
-    AllItemsSourceTrips = 4
+    Pay = 1
 }
 
 internal enum RequiredGlobalKeyValidationFailure

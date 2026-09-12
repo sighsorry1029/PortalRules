@@ -96,6 +96,7 @@ sighsorry_portalrules_destination_portal_denied: "You cannot use the destination
 sighsorry_portalrules_destination_portal_unavailable: "The destination portal is no longer accessible."
 sighsorry_portalrules_destination_position_invalid: "The destination portal has invalid position data."
 sighsorry_portalrules_fare_reservation_failed: "The portal fare could not be reserved. Please try again."
+sighsorry_portalrules_cargo_changed: "Your non-teleportable cargo changed. Choose the destination again to recalculate the fare."
 sighsorry_portalrules_invite_arrival_cooldown: "Invite arrival cooldown: {0} remaining."
 sighsorry_portalrules_invite_cooldown_account_capacity: "Invite portal cooldown storage has reached its account capacity."
 sighsorry_portalrules_invite_cooldown_data_unavailable: "Invite portal cooldown data is unavailable."

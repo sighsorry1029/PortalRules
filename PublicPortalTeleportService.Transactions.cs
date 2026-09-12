@@ -377,6 +377,7 @@ internal static partial class PublicPortalTeleportService
                 authorization.TargetPosition,
                 authorization.TargetRotation,
                 authorization.CoinCost,
+                authorization.CargoWeightUnits,
                 accountId,
                 sourceFavoriteId,
                 destinationFavoriteId,

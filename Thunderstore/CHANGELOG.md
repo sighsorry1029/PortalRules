@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.5
+- Simplified fare options to (distance)*(weight of non teleportable items)*k
+
 ## 1.0.4
 
 - Updated PortalRules for Valheim 1.0.7, including portal registration, portal-list access, map pointer/right-click handling, hover status formatting, and changed game method signatures.

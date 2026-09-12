@@ -14,7 +14,8 @@ $bodies = @(
     (Read-Method 'PublicPortalInteraction.cs' 'SetConnectionStatusAfterPortalTag'),
     (Read-Method 'PortalCoinWallet.cs' 'TryRefundPhysicalCoins'),
     (Read-Method 'PortalCoinWallet.cs' 'TryRestoreCurrencyPocketPayment'),
-    (Read-Method 'PublicPortalTeleportService.cs' 'CanTeleportWithItems')
+    (Read-Method 'PublicPortalTravelCost.cs' 'TryGetCargoWeightUnits'),
+    (Read-Method 'PublicPortalTravelCost.cs' 'CalculateFare')
 ) -join "`n"
 $fixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'BehaviorChecks.cs'))
 Add-Type -TypeDefinition ($fixture.Replace('/* PRODUCTION_METHODS */', $bodies))

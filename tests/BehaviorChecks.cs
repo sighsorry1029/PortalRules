@@ -6,6 +6,10 @@ public static class PortalRulesBehaviorChecks
 {
     private const string CoinPrefabName = "Coins";
     private static bool _coinAvailable = true;
+    private static bool _fareEnabled;
+    private const int CargoWeightScale = 1000;
+    private const int MaximumCargoWeightUnits = 1000000000;
+    private static bool IsEnabled => _fareEnabled;
     private static int _checks;
     private static bool TryGetCoinItemData(out ItemDrop.ItemData coin)
     {
@@ -74,18 +78,36 @@ public static class PortalRulesBehaviorChecks
         var unused = new Inventory();
         Check(TryRefundPhysicalCoins(unused, 0, out restored) && unused.Calls == 0, "Zero refund performs no mutation");
 
-        var travelPlayer = new Player { Teleportable = true };
-        Player.m_localPlayer = travelPlayer;
-        Check(CanTeleportWithItems(false) && !travelPlayer.LastAllowAll,
-            "Restricted source delegates to Valheim item policy");
-        Check(CanTeleportWithItems(true) && travelPlayer.LastAllowAll,
-            "All-items source flag reaches Valheim item policy");
-        travelPlayer.Teleportable = false;
-        Check(!CanTeleportWithItems(false),
-            "Valheim item denial is preserved");
-        Player.m_localPlayer = null;
-        Check(!CanTeleportWithItems(true),
-            "Missing local player cannot teleport");
+        var cargoPlayer = new Player();
+        cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 12.5f, m_stack = 5,
+            m_shared = new Shared { m_teleportable = false } });
+        cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 0.25f, m_stack = 1,
+            m_shared = new Shared { m_teleportable = false } });
+        cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 99f, m_stack = 1,
+            m_shared = new Shared { m_teleportable = true } });
+        _fareEnabled = false;
+        Check(!TryGetCargoWeightUnits(cargoPlayer, false, out int cargoWeight) && cargoWeight == 12750,
+            "Off blocks ordinary restricted cargo and still reports its weight");
+        _fareEnabled = true;
+        Check(TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight) && cargoWeight == 12750,
+            "Pay admits ordinary restricted cargo at a stable integer weight");
+        Check(TryGetCargoWeightUnits(cargoPlayer, true, out cargoWeight) && cargoWeight == 0,
+            "All-items source bypasses ordinary cargo fare");
+        ZoneSystem.instance.TeleportAll = true;
+        Check(TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight) && cargoWeight == 0,
+            "TeleportAll bypasses ordinary cargo fare");
+        cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 1f, m_stack = 1,
+            m_shared = new Shared { m_teleportable = false, m_toolTier = 1000 } });
+        Check(!TryGetCargoWeightUnits(cargoPlayer, true, out cargoWeight),
+            "Absolute restriction blocks all-items sources");
+        Check(!TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight),
+            "Absolute restriction blocks TeleportAll");
+        Check(CalculateFare(12500, 2000d, 0.1f) == 3,
+            "Fare rounds up weight multiplied by XZ kilometers and rate");
+        Check(CalculateFare(1000, 0d, 0.1f) == 0 && CalculateFare(0, 1000d, 0.1f) == 0,
+            "Zero distance or cargo is free");
+        Check(CalculateFare(1000, double.NaN, 1f) == 0 && CalculateFare(1000, 1000d, -1f) == 0,
+            "Invalid fare inputs fail free without overflow");
         return _checks + " behavior checks passed (production method bodies; game boundaries are test doubles).";
     }
 }

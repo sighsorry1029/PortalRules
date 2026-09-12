@@ -96,6 +96,7 @@ sighsorry_portalrules_destination_portal_denied: "목적지 포탈을 사용할 
 sighsorry_portalrules_destination_portal_unavailable: "목적지 포탈을 더 이상 이용할 수 없습니다."
 sighsorry_portalrules_destination_position_invalid: "목적지 포탈의 위치 데이터가 올바르지 않습니다."
 sighsorry_portalrules_fare_reservation_failed: "포탈 이용료를 결제하지 못했습니다. 다시 시도해 주세요."
+sighsorry_portalrules_cargo_changed: "이동 불가 화물이 변경되었습니다. 요금을 다시 계산하려면 목적지를 다시 선택해 주세요."
 sighsorry_portalrules_invite_arrival_cooldown: "초대 포탈 도착 재사용 대기시간: {0} 남음."
 sighsorry_portalrules_invite_cooldown_account_capacity: "초대 포탈 재사용 대기시간 저장소가 계정 수 한도에 도달했습니다."
 sighsorry_portalrules_invite_cooldown_data_unavailable: "초대 포탈 재사용 대기시간 데이터를 사용할 수 없습니다."

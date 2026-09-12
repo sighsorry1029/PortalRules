@@ -1,4 +1,6 @@
 using BepInEx.Configuration;
+using System;
+using System.IO;
 using UnityEngine;
 
 namespace PortalRules;
@@ -19,10 +21,8 @@ internal static class PublicPortalConfig
     public static ConfigEntry<PortalRulesPlugin.Toggle> EnableAccountPortalLimit = null!;
     public static ConfigEntry<int> MaxPortalsPerAccount = null!;
     public static ConfigEntry<string> CountedPortalPrefabs = null!;
-    public static ConfigEntry<PublicPortalTravelCostScope> TravelCostScope = null!;
-    public static ConfigEntry<int> BaseCoinCost = null!;
-    public static ConfigEntry<float> BaseFareIncludedDistanceMeters = null!;
-    public static ConfigEntry<float> CoinsPerKilometer = null!;
+    public static ConfigEntry<PublicPortalFareMode> PortalFareMode = null!;
+    public static ConfigEntry<float> CoinsPerWeightKilometer = null!;
 
     public static void Init(PortalRulesPlugin plugin)
     {
@@ -169,39 +169,71 @@ internal static class PublicPortalConfig
         MaxClanPortalsPerClan.SettingChanged += quotaSettingChanged;
         CountedPortalPrefabs.SettingChanged += quotaSettingChanged;
 
-        TravelCostScope = plugin.ConfigEntry(
+        PortalFareMode = plugin.ConfigEntry(
             "5 - Portal Travel Costs",
-            "Travel Cost Scope",
-            PublicPortalTravelCostScope.Off,
-            "Off disables Coins costs. All charges every handled portal trip. AdminPortalTrips charges trips where either endpoint is an Admin Portal prefab. PersonalAndClanRoutesFree makes a trip free only when both endpoints are Personal or Clan. AllItemsSourceTrips charges only when the source portal allows every item.",
-            order: 400,
-            categoryOrder: 100);
-        BaseCoinCost = plugin.ConfigEntry(
-            "5 - Portal Travel Costs",
-            "Base Coin Cost",
-            10,
-            new ConfigDescription(
-                "Coins charged for a paid portal trip before any distance surcharge.",
-                new AcceptableValueRange<int>(0, 1000000)),
-            order: 300,
-            categoryOrder: 100);
-        BaseFareIncludedDistanceMeters = plugin.ConfigEntry(
-            "5 - Portal Travel Costs",
-            "Base Fare Included Distance Meters",
-            1000f,
-            new ConfigDescription(
-                "XZ distance covered by the base fare before the per-kilometer surcharge begins.",
-                new AcceptableValueRange<float>(0f, 1000000f)),
+            "Portal Fare Mode",
+            ReadLegacyFareModeDefault(plugin.Config.ConfigFilePath),
+            "Off keeps Valheim's normal item teleport restrictions. Pay lets ordinary non-teleportable items use a portal for a Coins fare based on their total weight and travel distance. Items with an absolute teleport restriction remain blocked.",
             order: 200,
             categoryOrder: 100);
-        CoinsPerKilometer = plugin.ConfigEntry(
+        CoinsPerWeightKilometer = plugin.ConfigEntry(
             "5 - Portal Travel Costs",
-            "Coins Per Kilometer",
-            5f,
+            "Coins Per Weight Kilometer",
+            0.1f,
             new ConfigDescription(
-                "Additional Coins per kilometer beyond the distance included in the base fare. The surcharge is rounded up.",
+                "Coins charged per unit of ordinary non-teleportable item weight per kilometer of XZ travel distance. The final fare is rounded up.",
                 new AcceptableValueRange<float>(0f, 1000000f)),
             order: 100,
             categoryOrder: 100);
+    }
+
+    private static PublicPortalFareMode ReadLegacyFareModeDefault(
+        string configFilePath)
+    {
+        try
+        {
+            if (!File.Exists(configFilePath))
+            {
+                return PublicPortalFareMode.Off;
+            }
+
+            bool inFareSection = false;
+            foreach (string rawLine in File.ReadLines(configFilePath))
+            {
+                string line = rawLine.Trim();
+                if (line.StartsWith("[", StringComparison.Ordinal) &&
+                    line.EndsWith("]", StringComparison.Ordinal))
+                {
+                    inFareSection = string.Equals(
+                        line,
+                        "[5 - Portal Travel Costs]",
+                        StringComparison.Ordinal);
+                    continue;
+                }
+
+                if (!inFareSection ||
+                    !line.StartsWith(
+                        "Travel Cost Scope =",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string value = line.Substring(line.IndexOf('=') + 1).Trim();
+                return string.Equals(
+                    value,
+                    nameof(PublicPortalFareMode.Off),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? PublicPortalFareMode.Off
+                    : PublicPortalFareMode.Pay;
+            }
+        }
+        catch (Exception ex)
+        {
+            PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                $"Could not read the legacy portal fare setting; defaulting to Off: {ex.Message}");
+        }
+
+        return PublicPortalFareMode.Off;
     }
 }
