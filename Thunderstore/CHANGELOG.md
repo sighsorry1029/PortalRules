@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.7
+
+- Changed the account portal limit default to Off for new configurations while preserving existing saved values.
+- Added a specific two-line placement message when account portal limits are enabled with Crossplay/PlayFab, explaining that Steamworks is required and that players can disable Crossplay or the account portal limit.
+
 ## 1.0.6
 
 - Debounced local configuration saves and external-file reloads, preventing repeated writes caused by clustered setting and file-watcher events while keeping live configuration updates.

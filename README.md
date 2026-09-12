@@ -132,7 +132,7 @@ A Required GlobalKey, when present, is checked in addition to the access mode.
 |---|---:|
 | Portal map | On |
 | Public duration | `900` seconds / 15 minutes |
-| Portals per Steam account | `10` |
+| Account portal limit | Off (`10` portals when enabled) |
 | Invite portals per Steam account | `1` |
 | Invite departure / arrival cooldown | `1` hour / `1` hour |
 | Clan portals per Clan | `5` |
@@ -145,6 +145,8 @@ Setting an effective Invite limit to `0` returns eligible Invite portals to thei
 Public expiry uses an absolute UTC deadline, so server downtime and unloaded regions still count. Admin portal prefabs and Builderless portals are excluded from that timer.
 
 Disabling `Enable Account Portal Limit` bypasses only the overall account limit and `portal_limit` overrides. Invite and Clan limits remain active.
+
+The account portal limit requires a Steamworks connection and is Off by default. If it is explicitly enabled for a Crossplay/PlayFab session, placement of counted portal prefabs is blocked with guidance to disable Crossplay or the account limit. Existing configuration files keep their saved value.
 
 Overall and Invite limits are shared by every character on the authenticated Steam account. The configurable default counted prefabs are `portal_wood`, `portal`, and `portal_stone`; Admin portals and normal portals with neither a valid Builder nor a creator ID are excluded. Lowering the overall limit never destroys existing portals.
 

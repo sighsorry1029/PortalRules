@@ -187,8 +187,8 @@ internal static class PublicPortalConfig
         EnableAccountPortalLimit = ConfigEntry(
             "4 - Account Portal Limit",
             "Enable Account Portal Limit",
-            PortalRulesPlugin.Toggle.On,
-            "If on, the server limits player-built portals by authenticated SteamID64, across all characters on that Steam account. If off, the account limit and every portal_limit override are bypassed; Invite and Clan limits remain active.",
+            PortalRulesPlugin.Toggle.Off,
+            "If on, the server limits player-built portals by authenticated SteamID64, across all characters on that Steam account. This requires a Steamworks connection; Crossplay uses PlayFab and cannot verify the required SteamID64. If off, the account limit and every portal_limit override are bypassed; Invite and Clan limits remain active.",
             order: 300,
             categoryOrder: 200);
         MaxPortalsPerAccount = ConfigEntry(

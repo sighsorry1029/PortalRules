@@ -399,6 +399,13 @@ internal static class PublicPortalServerPolicy
             return false;
         }
 
+        if (ZNet.m_onlineBackend != OnlineBackendType.Steamworks)
+        {
+            message = PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_portal_limit_crossplay_unsupported");
+            return true;
+        }
+
         string syncMessage = PortalRulesLocalization.Translate(
             "$sighsorry_portalrules_portal_limit_syncing");
         int limit;

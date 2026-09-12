@@ -122,6 +122,7 @@ sighsorry_portalrules_tagged_uses_connection: "태그 연결 포탈은 연결된
 sighsorry_portalrules_teleport_start_failed: "포탈 이동을 시작하지 못했습니다. 다시 시도해 주세요."
 sighsorry_portalrules_waiting_for_server: "서버의 포탈 이동 승인을 기다리는 중입니다."
 sighsorry_portalrules_portal_limit_syncing: "포탈 제한 정보를 서버와 동기화 중입니다. 잠시 후 다시 시도해 주세요."
+sighsorry_portalrules_portal_limit_crossplay_unsupported: "포탈 계정 한도는 Steamworks 연결이 필요합니다.\n크로스플레이를 끄거나 Enable Account Portal Limit을 끄세요."
 sighsorry_portalrules_portal_limit_placement_blocked: "포탈은 계정당 최대 {0}개까지 설치할 수 있습니다."
 sighsorry_portalrules_duration_minutes: "{0}분"
 sighsorry_portalrules_duration_hours: "{0}시간"

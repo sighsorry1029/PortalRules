@@ -18,7 +18,7 @@ namespace PortalRules;
 public class PortalRulesPlugin : BaseUnityPlugin
 {
     internal const string ModName = "PortalRules";
-    internal const string ModVersion = "1.0.6";
+    internal const string ModVersion = "1.0.7";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
     internal const string ClanSoftDependencyGuid = "sighsorry.Clan";

@@ -122,6 +122,7 @@ sighsorry_portalrules_tagged_uses_connection: "Tagged portals use their connecte
 sighsorry_portalrules_teleport_start_failed: "Portal travel could not start. Please try again."
 sighsorry_portalrules_waiting_for_server: "Waiting for the server to approve portal travel."
 sighsorry_portalrules_portal_limit_syncing: "Portal limit information is still synchronizing with the server. Please try again shortly."
+sighsorry_portalrules_portal_limit_crossplay_unsupported: "Portal account limits require a Steamworks connection.\nDisable Crossplay or turn off Enable Account Portal Limit."
 sighsorry_portalrules_portal_limit_placement_blocked: "You can place at most {0} portals per account."
 sighsorry_portalrules_duration_minutes: "{0}m"
 sighsorry_portalrules_duration_hours: "{0}h"
