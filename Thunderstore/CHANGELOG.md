@@ -1,6 +1,13 @@
 # Changelog
 
+## 1.0.6
+
+- Debounced local configuration saves and external-file reloads, preventing repeated writes caused by clustered setting and file-watcher events while keeping live configuration updates.
+- Cleaned up configuration callbacks and file watching during shutdown or reinitialization so handlers do not accumulate in the same game process.
+- Reorganized configuration ownership and portal lifecycle Harmony wiring to reduce maintenance and verification cost without changing settings, network messages, access rules, or travel behavior.
+
 ## 1.0.5
+
 - Simplified fare options to (distance)*(weight of non teleportable items)*k
 
 ## 1.0.4
