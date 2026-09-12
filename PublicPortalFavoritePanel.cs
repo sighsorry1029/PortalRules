@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Jotunn.Managers;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -544,7 +543,7 @@ internal sealed class PublicPortalFavoritePanel
         layout.preferredHeight = fontSize + 10f;
 
         Text label = labelObject.GetComponent<Text>();
-        label.font = GUIManager.Instance.AveriaSerif;
+        label.font = PublicPortalMapController.PortalFont;
         label.fontSize = fontSize;
         label.fontStyle = style;
         label.alignment = TextAnchor.MiddleLeft;

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.4
+
+- Updated PortalRules for Valheim 1.0.7, including portal registration, portal-list access, map pointer/right-click handling, hover status formatting, and changed game method signatures.
+- Removed the hard Jotunn dependency. Admin portal cloning, network-scene and Hammer registration, cleanup, and UI font selection are now owned by PortalRules while preserving the existing admin portal prefab names and hashes.
+- Preserved portal authority changes in Valheim's separate portal save chunk, including admin creator metadata, and made server-world readiness idempotent across the new load path.
+- Applied Valheim's absolute item restrictions to all-items portals and prevented refund overflow from creating world drops before CurrencyPocket fallback, reducing item loss or duplication risk.
+- Updated the bundled ServerSync to the reviewed `valheim-1.0.7-r1` build, preserving configuration/version contracts while fixing 1.0.7 API access and connection-initialization message ordering.
+- Updated the required BepInExPack Valheim dependency to 5.4.2350 and added client/dedicated static compatibility and focused behavior checks.
+
 ## 1.0.3
 
 - Show CONNECTED only for Tagged portals with a reciprocal connection; hide connection status in other access modes.

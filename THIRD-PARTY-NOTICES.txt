@@ -21,6 +21,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ServerSync
 Copyright 2021 Tykea
 
+The bundled `valheim-1.0.7-r1` build is compiled from the preserved upstream source
+against the original Valheim 1.0.7 assemblies. Its assembly identity and public
+contract remain compatible; its source, changes, build inputs and verification are
+recorded in the shared ServerSync reference described in docs/valheim-1.0.7.md.
+
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to

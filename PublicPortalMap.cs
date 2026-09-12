@@ -191,7 +191,9 @@ internal static class PublicPortalMap
         }
     }
 
-    [HarmonyPatch(typeof(Minimap), nameof(Minimap.OnMapRightClick))]
+    // Valheim routes right-click and touch long-press through this operation.
+    // Both toggle favorites while selecting; ordinary pin deletion passes through.
+    [HarmonyPatch(typeof(Minimap), "RemovePinUnderPointer")]
     private static class PortalMapRightClickPatch
     {
         private static bool Prefix(Minimap __instance)

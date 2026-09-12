@@ -27,6 +27,31 @@ internal sealed class PublicPortalMapController
 
     public static readonly PublicPortalMapController Instance = new();
 
+    private static Font? _portalFont;
+
+    // Shared by the legacy Text labels in pins and favorites. Borrow the game's
+    // font once when creating UI; never search assets from a per-frame path.
+    internal static Font PortalFont
+    {
+        get
+        {
+            if (_portalFont != null)
+            {
+                return _portalFont;
+            }
+            foreach (Font font in Resources.FindObjectsOfTypeAll<Font>())
+            {
+                if (font.name == "AveriaSerifLibre-Regular")
+                {
+                    return _portalFont = font;
+                }
+            }
+            PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                "AveriaSerifLibre-Regular is unavailable; using the built-in UI font.");
+            return _portalFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+    }
+
     private readonly PublicPortalPinController _pins = new();
     private readonly PublicPortalFavoritePanel _favorites = new();
 
@@ -412,7 +437,7 @@ internal sealed class PublicPortalMapController
 
         try
         {
-            Vector3 worldPoint = ScreenToWorldPoint(minimap, ZInput.mousePosition);
+            Vector3 worldPoint = ScreenToWorldPoint(minimap, ZInput.pointerPosition);
             return _pins.FindClosest(worldPoint);
         }
         catch (Exception ex)

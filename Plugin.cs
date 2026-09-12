@@ -13,7 +13,6 @@ using UnityEngine;
 namespace PortalRules;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
-[BepInDependency(Jotunn.Main.ModGuid)]
 [BepInDependency(ClanSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(CurrencyPocketSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(YouAreNotWorthySoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
@@ -21,7 +20,7 @@ namespace PortalRules;
 public class PortalRulesPlugin : BaseUnityPlugin
 {
     internal const string ModName = "PortalRules";
-    internal const string ModVersion = "1.0.3";
+    internal const string ModVersion = "1.0.4";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
     internal const string ClanSoftDependencyGuid = "sighsorry.Clan";
@@ -47,6 +46,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
 
     public void Awake()
     {
+        Game.isModded = true;
         bool saveOnSet = Config.SaveOnConfigSet;
         Config.SaveOnConfigSet = false;
         try
@@ -66,7 +66,6 @@ public class PortalRulesPlugin : BaseUnityPlugin
             Assembly assembly = Assembly.GetExecutingAssembly();
             ClanPortalAccess.RegistryChanged += OnClanRegistryChanged;
             ClanPortalAccess.Initialize();
-            AdminPortalPrefabManager.Initialize();
             _harmony.PatchAll(assembly);
             Config.Save();
         }

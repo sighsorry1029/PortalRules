@@ -287,7 +287,7 @@ internal static class PublicPortalInteraction
         ZDO? zdo = ZDOMan.instance.GetZDO(portalId);
         if (zdo == null ||
             !zdo.IsValid() ||
-            !ZDOMan.instance.GetPortals().Contains(zdo))
+            !PublicPortalKinds.IsRegisteredPortal(zdo))
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_destination_not_managed_portal");
@@ -528,7 +528,7 @@ internal static class PublicPortalInteraction
             ZNet.instance == null ||
             !ZNet.instance.IsServer() ||
             ZDOMan.instance == null ||
-            !ZDOMan.instance.GetPortals().Contains(zdo))
+            !PublicPortalKinds.IsRegisteredPortal(zdo))
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_requested_portal_unavailable");
@@ -709,12 +709,15 @@ internal static class PublicPortalInteraction
         }
     }
 
-    [HarmonyPatch(typeof(ZNet), "LoadWorld")]
+    [HarmonyPatch(typeof(ZNet), "ServerLoadWorld")]
     private static class ServerWorldLoadedPatch
     {
         private static void Postfix(ZNet __instance)
         {
-            PublicPortalCatalog.NotifyServerWorldLoaded(__instance);
+            if (__instance.IsServer() && !ZNet.m_loadError)
+            {
+                PublicPortalCatalog.NotifyServerWorldLoaded(__instance);
+            }
         }
     }
 
@@ -738,12 +741,19 @@ internal static class PublicPortalInteraction
         }
     }
 
-    [HarmonyPatch(typeof(ZDOMan), "AddPortal")]
+    [HarmonyPatch(typeof(ZDOMan), "AddIfPortal", typeof(ZDO), typeof(int))]
     private static class ObserveAddedPortalPatch
     {
-        private static void Postfix(ZDO zdo)
+        private static void Postfix(ZDOMan __instance, ZDO zdo, int prefabHash)
         {
-            if (ZNet.instance != null && ZNet.instance.IsServer())
+            // CreateNewZDO calls this before inserting/initializing its ZDO.
+            // Observe that local path in TeleportWorld.Awake; RPC_ZDOData calls
+            // here again after Deserialize, while the authenticated context lives.
+            if (ZNet.instance != null && ZNet.instance.IsServer() &&
+                Game.instance != null && Game.instance.PortalPrefabHash.Contains(prefabHash) &&
+                zdo.GetPrefab() == prefabHash &&
+                ReferenceEquals(__instance.GetZDO(zdo.m_uid), zdo) &&
+                PublicPortalKinds.IsRegisteredPortal(zdo))
             {
                 PublicPortalCatalog.ObservePortal(zdo);
             }
@@ -1022,8 +1032,8 @@ internal static class PublicPortalInteraction
         // The actual sanitized, localized tag fixes the boundary even when a
         // saved or externally supplied tag contains quotes or line breaks.
         int suffixStart = portalTagHeader.Length;
-        string connectedSuffix = "  [" + connectedLabel + "]";
-        string unconnectedSuffix = "  [" + unconnectedLabel + "]";
+        string connectedSuffix = " [" + connectedLabel + "]";
+        string unconnectedSuffix = " [" + unconnectedLabel + "]";
         int remainingLength = hoverText.Length - suffixStart;
         bool hasConnectedSuffix = remainingLength >= connectedSuffix.Length &&
                                   string.CompareOrdinal(
@@ -1064,7 +1074,7 @@ internal static class PublicPortalInteraction
 
         string replacement = string.IsNullOrEmpty(connectionStatus)
             ? ""
-            : "  [" + connectionStatus + "]";
+            : " [" + connectionStatus + "]";
         return portalTagHeader + replacement + hoverText.Substring(suffixEnd);
     }
 

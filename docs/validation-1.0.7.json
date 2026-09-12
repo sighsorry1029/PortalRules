@@ -1,0 +1,43 @@
+{
+  "utc": "2026-09-09T19:13:02.9557797Z",
+  "baselineCommit": "1fbc5e922a8677770e2b30cbe9db257666a281c0",
+  "build": "Release 1.0.4 / original Valheim 1.0.7 references / 0 warnings / 0 errors",
+  "behavior": "85 behavior checks passed (production method bodies; game boundaries are test doubles).",
+  "client": {
+    "GameMemberInstructionsResolved": 1539,
+    "ExplicitHarmonyTargetsChecked": 42,
+    "InjectedFieldsChecked": 3,
+    "DynamicTargetsRequiringSeparateCheck": [
+      "PortalRules.AdminPortalPrefabManager/RegisterHammerPiecesPatch"
+    ],
+    "JotunnAssemblyReference": false,
+    "DynamicHammerTargetsChecked": 2,
+    "PrivateFieldContractsChecked": 5,
+    "WheelTranspilerAnchors": 1,
+    "Note": "Static metadata/IL checks; does not install Harmony patches or execute Unity."
+  },
+  "dedicated": {
+    "GameMemberInstructionsResolved": 1539,
+    "ExplicitHarmonyTargetsChecked": 42,
+    "InjectedFieldsChecked": 3,
+    "DynamicTargetsRequiringSeparateCheck": [
+      "PortalRules.AdminPortalPrefabManager/RegisterHammerPiecesPatch"
+    ],
+    "JotunnAssemblyReference": false,
+    "DynamicHammerTargetsChecked": 2,
+    "PrivateFieldContractsChecked": 5,
+    "WheelTranspilerAnchors": 1,
+    "Note": "Static metadata/IL checks; does not install Harmony patches or execute Unity."
+  },
+  "releaseDllSha256": "0A3C29078556BD8B2CBD85DD2F3680285D174B14F02F27D0C3B08708EEB94213",
+  "thunderstoreZipSha256": "847D957549C3883FCE84DCB6EC8581CB0091D2A09C2EA91CA4F4847743AE3425",
+  "nexusZipSha256": "FF91C013B9EB0A327205D865BC349924DB0296DF954E1D8094F51D308CD0C113",
+  "clientGameSha256": "A5130F5A957AB51CB6538F5412CBE57B43F927F4A679918BFF199B5C905D01BC",
+  "serverGameSha256": "9DF99B0011B4CA0A448E6D935C77368B4E3B98EEE7B0AC8D1B43B34E267471B2",
+  "serverSyncBaselineId": "valheim-1.0.7-r1",
+  "serverSyncInputSha256": "B4DD786997F4E90D770F09EF3E9D64154754FE7E8EDFB4841795751895B35846",
+  "runtimeExecuted": false,
+  "releaseCreated": true,
+  "releasePackageContentsVerified": true,
+  "publishedOrUploaderStateChecked": false
+}

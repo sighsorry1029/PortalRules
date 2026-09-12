@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
-using Jotunn.Configs;
-using Jotunn.Managers;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -25,22 +23,70 @@ internal static class AdminPortalPrefabManager
     };
 
     private static bool _registered;
+    private static ZNetScene? _prefabScene;
+    private static GameObject? _prefabRoot;
+    private static readonly List<GameObject> OwnedPrefabs = new(2);
+    private static readonly HashSet<PieceTable> RegisteredTables = new();
+    private static readonly AccessTools.FieldRef<ZNetScene, Dictionary<int, GameObject>> NamedPrefabs =
+        AccessTools.FieldRefAccess<ZNetScene, Dictionary<int, GameObject>>("m_namedPrefabs");
+    private static readonly AccessTools.FieldRef<ObjectDB, List<Piece>> CachedBuildPieces =
+        AccessTools.FieldRefAccess<ObjectDB, List<Piece>>("m_buildPieces");
+    private static readonly AccessTools.FieldRef<PieceTable, List<List<Piece>>> PiecesByCategory =
+        AccessTools.FieldRefAccess<PieceTable, List<List<Piece>>>("m_availablePiecesByCategory");
     private static Player? _lastBuildMenuPlayer;
     private static bool _lastBuildMenuAccess;
     private static bool _buildMenuAccessInitialized;
     private static readonly MethodInfo? UpdateAvailablePiecesMethod =
         AccessTools.DeclaredMethod(typeof(Player), "UpdateAvailablePiecesList");
 
-    internal static void Initialize()
-    {
-        PrefabManager.OnVanillaPrefabsAvailable += RegisterAdminPortals;
-        PieceManager.OnPiecesRegistered += RegisterAdminPortalPieces;
-    }
-
     internal static void Shutdown()
     {
-        PrefabManager.OnVanillaPrefabsAvailable -= RegisterAdminPortals;
-        PieceManager.OnPiecesRegistered -= RegisterAdminPortalPieces;
+        foreach (PieceTable table in RegisteredTables)
+        {
+            if (table != null)
+            {
+                table.m_availablePieces.RemoveWhere(IsAdminPortalPiece);
+                table.m_enabledPieces.RemoveWhere(IsAdminPortalPiece);
+                foreach (List<Piece> category in PiecesByCategory(table))
+                {
+                    category.RemoveAll(IsAdminPortalPiece);
+                }
+                foreach (GameObject prefab in OwnedPrefabs)
+                {
+                    table.m_pieces.Remove(prefab);
+                }
+            }
+        }
+        RegisteredTables.Clear();
+        if (ObjectDB.instance != null)
+        {
+            CachedBuildPieces(ObjectDB.instance) = null!;
+        }
+        if (_prefabScene != null)
+        {
+            Dictionary<int, GameObject> named = NamedPrefabs(_prefabScene);
+            foreach (GameObject prefab in OwnedPrefabs)
+            {
+                if (prefab == null)
+                {
+                    continue;
+                }
+                _prefabScene.m_prefabs.Remove(prefab);
+                int hash = prefab.name.GetStableHashCode();
+                if (named.TryGetValue(hash, out GameObject current) && ReferenceEquals(current, prefab))
+                {
+                    named.Remove(hash);
+                }
+            }
+        }
+        OwnedPrefabs.Clear();
+        if (_prefabRoot != null)
+        {
+            Object.Destroy(_prefabRoot);
+        }
+        _prefabRoot = null;
+        _prefabScene = null;
+        _registered = false;
         _lastBuildMenuPlayer = null;
         _lastBuildMenuAccess = false;
         _buildMenuAccessInitialized = false;
@@ -91,84 +137,116 @@ internal static class AdminPortalPrefabManager
         }
     }
 
-    private static void RegisterAdminPortals()
+    private static void RegisterAdminPortals(ZNetScene scene)
     {
-        if (_registered)
+        if (ReferenceEquals(_prefabScene, scene))
         {
-            PrefabManager.OnVanillaPrefabsAvailable -= RegisterAdminPortals;
             return;
         }
-
-        int registeredCount = 0;
+        Shutdown();
+        _prefabScene = scene;
+        // These clones live only as long as the scene holding the source assets.
+        // No independent SoftReference asset or persistent cross-scene clone is
+        // created. The inactive parent suppresses Awake/ZDO creation on templates.
+        _prefabRoot = new GameObject("PortalRulesPrefabs");
+        _prefabRoot.SetActive(false);
+        _prefabRoot.transform.SetParent(scene.transform, false);
         foreach (PortalCloneSpec spec in PortalCloneSpecs)
         {
-            GameObject? prefab = PrefabManager.Instance.GetPrefab(spec.TargetPrefabName);
-            if (prefab != null)
+            GameObject? source = null;
+            int targetHash = spec.TargetPrefabName.GetStableHashCode();
+            foreach (GameObject candidate in scene.m_prefabs)
             {
-                registeredCount++;
-                continue;
+                if (candidate == null)
+                {
+                    continue;
+                }
+                if (candidate.name.GetStableHashCode() == targetHash)
+                {
+                    throw new InvalidOperationException(
+                        $"Admin portal prefab name/hash collision: {spec.TargetPrefabName} / {candidate.name}.");
+                }
+                if (candidate.name == spec.SourcePrefabName)
+                {
+                    source = candidate;
+                }
             }
-
-            Piece? sourcePiece = PrefabManager.Instance
-                .GetPrefab(spec.SourcePrefabName)
-                ?.GetComponent<Piece>();
-            prefab = PrefabManager.Instance.CreateClonedPrefab(
-                spec.TargetPrefabName,
-                spec.SourcePrefabName);
-            if (prefab == null)
+            if (source == null)
             {
-                PortalRulesPlugin.PortalRulesLogger.LogWarning(
-                    $"Could not clone '{spec.SourcePrefabName}' into '{spec.TargetPrefabName}'.");
-                continue;
+                throw new InvalidOperationException($"Missing vanilla portal prefab: {spec.SourcePrefabName}.");
             }
-
-            PrepareAdminPortal(prefab, sourcePiece, spec.DisplayName);
-            PrefabManager.Instance.AddPrefab(prefab);
-            registeredCount++;
+            GameObject prefab = Object.Instantiate(source, _prefabRoot.transform, false);
+            prefab.name = spec.TargetPrefabName;
+            OwnedPrefabs.Add(prefab);
+            PrepareAdminPortal(prefab, source.GetComponent<Piece>(), spec.DisplayName);
+            // The original ZNetScene.Awake builds its private hash dictionary
+            // from this list, before any saved/network ZDO is instantiated.
+            scene.m_prefabs.Add(prefab);
         }
-
-        if (registeredCount == PortalCloneSpecs.Length)
-        {
-            _registered = true;
-            PrefabManager.OnVanillaPrefabsAvailable -= RegisterAdminPortals;
-            PortalRulesPlugin.PortalRulesLogger.LogInfo(
-                $"Registered admin portal prefabs: {PublicPortalKinds.AdminWoodPortalPrefabName}, {PublicPortalKinds.AdminStonePortalPrefabName}.");
-        }
+        _registered = true;
+        RegisterAdminPortalPieces();
+        PortalRulesPlugin.PortalRulesLogger.LogInfo("Registered the two admin portal prefabs without Jotunn.");
     }
 
     private static void RegisterAdminPortalPieces()
     {
-        int registeredCount = 0;
-        foreach (PortalCloneSpec spec in PortalCloneSpecs)
+        if (!_registered || ObjectDB.instance == null)
         {
-            GameObject? prefab = PrefabManager.Instance.GetPrefab(spec.TargetPrefabName);
-            if (prefab == null)
+            return;
+        }
+        PieceTable? table = ObjectDB.instance.GetItemPrefab("Hammer")
+            ?.GetComponent<ItemDrop>()?.m_itemData.m_shared.m_buildPieces;
+        if (table == null)
+        {
+            return;
+        }
+        foreach (GameObject prefab in OwnedPrefabs)
+        {
+            if (!table.m_pieces.Contains(prefab))
             {
-                PortalRulesPlugin.PortalRulesLogger.LogWarning(
-                    $"Could not find admin portal '{spec.TargetPrefabName}' for Hammer registration.");
-                continue;
-            }
-
-            try
-            {
-                PieceManager.Instance.RegisterPieceInPieceTable(
-                    prefab,
-                    PieceTables.Hammer,
-                    PieceCategories.Misc);
-                registeredCount++;
-            }
-            catch (Exception ex)
-            {
-                PortalRulesPlugin.PortalRulesLogger.LogWarning(
-                    $"Could not add admin portal '{spec.TargetPrefabName}' to the Hammer piece table: {ex.Message}");
+                table.m_pieces.Add(prefab);
+                CachedBuildPieces(ObjectDB.instance) = null!;
             }
         }
+        RegisteredTables.Add(table);
+    }
 
-        if (registeredCount == PortalCloneSpecs.Length)
+    [HarmonyPatch(typeof(ZNetScene), "Awake")]
+    private static class RegisterNetworkPrefabsPatch
+    {
+        private static void Prefix(ZNetScene __instance) => RegisterAdminPortals(__instance);
+
+        private static Exception? Finalizer(Exception? __exception, ZNetScene __instance)
         {
-            PortalRulesPlugin.PortalRulesLogger.LogInfo(
-                "Registered admin portal pieces in the Hammer Misc category.");
+            if (__exception != null && ReferenceEquals(_prefabScene, __instance))
+            {
+                Shutdown();
+            }
+            return __exception;
         }
+    }
+
+    [HarmonyPatch(typeof(ZNetScene), "OnDestroy")]
+    private static class ReleaseNetworkPrefabsPatch
+    {
+        private static void Prefix(ZNetScene __instance)
+        {
+            if (ReferenceEquals(_prefabScene, __instance))
+            {
+                Shutdown();
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    private static class RegisterHammerPiecesPatch
+    {
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return AccessTools.DeclaredMethod(typeof(ObjectDB), "Awake");
+            yield return AccessTools.DeclaredMethod(typeof(ObjectDB), nameof(ObjectDB.CopyOtherDB));
+        }
+        private static void Postfix() => RegisterAdminPortalPieces();
     }
 
     private static void PrepareAdminPortal(
@@ -445,11 +523,13 @@ internal static class AdminPortalPrefabManager
     {
         private static void Postfix(
             Piece __instance,
-            ref long ___m_creator)
+            ref long ___m_creator,
+            ref int ___m_creatorPlatformUserIDIndex)
         {
             if (IsAdminPortalPiece(__instance))
             {
                 ___m_creator = 0L;
+                ___m_creatorPlatformUserIDIndex = -1;
                 if (!ZNetView.m_forceDisableInit)
                 {
                     // Placement ghosts need the source solid collider for
@@ -481,9 +561,11 @@ internal static class AdminPortalPrefabManager
         private static void Postfix(
             PieceTable __instance,
             Player player,
-            List<List<Piece>> ___m_availablePieces)
+            List<List<Piece>> ___m_availablePiecesByCategory)
         {
-            foreach (List<Piece> availablePieces in ___m_availablePieces)
+            __instance.m_availablePieces.RemoveWhere(IsAdminPortalPiece);
+            __instance.m_enabledPieces.RemoveWhere(IsAdminPortalPiece);
+            foreach (List<Piece> availablePieces in ___m_availablePiecesByCategory)
             {
                 availablePieces.RemoveAll(IsAdminPortalPiece);
             }
@@ -495,12 +577,12 @@ internal static class AdminPortalPrefabManager
             }
 
             int miscIndex = (int)Piece.PieceCategory.Misc;
-            if (miscIndex < 0 || miscIndex >= ___m_availablePieces.Count)
+            if (miscIndex < 0 || miscIndex >= ___m_availablePiecesByCategory.Count)
             {
                 return;
             }
 
-            List<Piece> miscPieces = ___m_availablePieces[miscIndex];
+            List<Piece> miscPieces = ___m_availablePiecesByCategory[miscIndex];
             foreach (GameObject prefab in __instance.m_pieces)
             {
                 Piece? piece = prefab != null ? prefab.GetComponent<Piece>() : null;
@@ -509,6 +591,8 @@ internal static class AdminPortalPrefabManager
                     !miscPieces.Contains(piece))
                 {
                     miscPieces.Add(piece);
+                    __instance.m_availablePieces.Add(piece);
+                    __instance.m_enabledPieces.Add(piece);
                 }
             }
         }

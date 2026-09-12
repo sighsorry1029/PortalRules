@@ -25,6 +25,14 @@ internal static class PublicPortalKinds
                prefabHash == AdminStonePortalHash;
     }
 
+    internal static bool IsRegisteredPortal(ZDO zdo)
+    {
+        // Membership is authoritative; a claimed prefab hash alone is insufficient.
+        return zdo != null && zdo.IsValid() && ZDOMan.instance != null &&
+               ZDOMan.instance.GetPortals().TryGetValue(zdo.GetSectorIndex(), out var portals) &&
+               portals.Contains(zdo);
+    }
+
     internal static bool PrefabAllowsAllItems(int prefabHash)
     {
         if (IsAdminPortalPrefab(prefabHash))

@@ -334,7 +334,11 @@ internal static class PortalCoinWallet
                 coin.m_quality,
                 coin.m_variant,
                 0L,
-                "");
+                "",
+                new Vector2i(-1, -1),
+                cheated: false,
+                pickedUp: false,
+                dropIfFullInv: false);
         }
         catch (Exception ex)
         {

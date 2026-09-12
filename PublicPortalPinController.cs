@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
-using Jotunn.Managers;
 using Splatform;
 using UnityEngine;
 using UnityEngine.UI;
@@ -411,7 +410,7 @@ internal sealed class PublicPortalPinController
         rect.sizeDelta = size;
 
         Text text = textObject.GetComponent<Text>();
-        text.font = GUIManager.Instance.AveriaSerif;
+        text.font = PublicPortalMapController.PortalFont;
         text.fontSize = fontSize;
         text.fontStyle = fontStyle;
         text.alignment = TextAnchor.MiddleCenter;
@@ -586,7 +585,7 @@ internal sealed class PublicPortalPinController
         countRect.offsetMax = Vector2.zero;
 
         Text count = countObject.GetComponent<Text>();
-        count.font = GUIManager.Instance.AveriaSerif;
+        count.font = PublicPortalMapController.PortalFont;
         count.fontSize = 14;
         count.fontStyle = FontStyle.Bold;
         count.alignment = TextAnchor.MiddleLeft;

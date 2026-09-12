@@ -336,11 +336,19 @@ internal static partial class PublicPortalCatalog
 
     public static void NotifyServerWorldLoaded(ZNet znet)
     {
+        if (!znet.IsServer() || ZNet.m_loadError)
+        {
+            return;
+        }
         if (!ReferenceEquals(_sessionZNet, znet))
         {
             BeginNetworkSession(znet);
         }
 
+        if (_worldLoaded)
+        {
+            return;
+        }
         _worldLoaded = true;
         if (znet.IsServer())
         {
@@ -1352,7 +1360,7 @@ internal static partial class PublicPortalCatalog
 
         if (ZDOMan.instance != null)
         {
-            foreach (ZDO portal in ZDOMan.instance.GetPortals())
+            foreach (ZDO portal in ZDOMan.instance.GetPortalList())
             {
                 if (portal != null && portal.IsValid())
                 {
@@ -1585,7 +1593,7 @@ internal static partial class PublicPortalCatalog
         int returnedDisabledInvitePortals = 0;
         HashSet<ZDOID> livePortalIds = new();
         List<PublicPortalCatalogEntry> snapshot = new();
-        ZDO[] portals = ZDOMan.instance.GetPortals()
+        ZDO[] portals = ZDOMan.instance.GetPortalList()
             .Where(portal => portal != null)
             .OrderBy(portal => portal.m_uid)
             .ToArray();
@@ -2087,7 +2095,8 @@ internal static partial class PublicPortalCatalog
         bool adminCreatorIsEmpty =
             !PublicPortalKinds.IsAdminPortalPrefab(authority.PrefabHash) ||
             portal.GetLong(ZDOVars.s_creator, 0L) == 0L &&
-            string.IsNullOrEmpty(portal.GetString(ZDOVars.s_creatorName, ""));
+            string.IsNullOrEmpty(portal.GetString(ZDOVars.s_creatorName, "")) &&
+            portal.GetInt(ZDOVars.s_creatorIndex, -1) == -1;
         bool adminPortalIsServerOwned =
             !PublicPortalKinds.IsAdminPortalPrefab(authority.PrefabHash) ||
             ZNet.instance != null &&
@@ -2145,6 +2154,8 @@ internal static partial class PublicPortalCatalog
         ServerPortalAuthority authority,
         bool forceSend)
     {
+        uint previousRevision = portal.DataRevision;
+        ushort previousOwnerRevision = portal.OwnerRevision;
         portal.SetPrefab(authority.PrefabHash);
         PublicPortalData.SetAccessMode(portal, authority.AccessMode, authority.Owner);
         PublicPortalData.SetAuthorizedClanId(portal, authority.AuthorizedClanId);
@@ -2162,6 +2173,7 @@ internal static partial class PublicPortalCatalog
             AdminPortalTagAuthority adminTag = AdminPortalTags[portal.m_uid];
             portal.Set(ZDOVars.s_creator, 0L);
             portal.Set(ZDOVars.s_creatorName, "");
+            portal.Set(ZDOVars.s_creatorIndex, -1);
             portal.Set(ZDOVars.s_tag, adminTag.Tag);
             portal.Set(ZDOVars.s_tagauthor, "");
             if (ZNet.instance != null && ZNet.instance.IsServer())
@@ -2176,6 +2188,13 @@ internal static partial class PublicPortalCatalog
         portal.Set(
             PublicPortalData.BuilderAuthorityVersionKey,
             PublicPortalData.CurrentBuilderAuthorityVersion);
+        // Portals are saved in a separate chunk in 1.0. Ordinary ZDO.Set only
+        // marks spatial chunks; metadata-only changes must mark the portal chunk.
+        if ((portal.DataRevision != previousRevision || portal.OwnerRevision != previousOwnerRevision) &&
+            ZNet.instance != null && ZNet.instance.IsServer())
+        {
+            ZDOMan.instance?.SetDirtyPortals();
+        }
         if (forceSend && ZDOMan.instance != null)
         {
             ZDOMan.instance.ForceSendZDO(portal.m_uid);
@@ -3576,7 +3595,7 @@ internal static partial class PublicPortalCatalog
             .ToHashSet();
         if (ZDOMan.instance != null)
         {
-            foreach (ZDO portal in ZDOMan.instance.GetPortals())
+            foreach (ZDO portal in ZDOMan.instance.GetPortalList())
             {
                 if (portal == null ||
                     portal.GetInt(

@@ -1,10 +1,9 @@
 {
   "name": "PortalRules",
-  "version_number": "1.0.3",
+  "version_number": "1.0.4",
   "website_url": "https://discord.gg/jkcJCq2sK5",
   "description": "Adds secure portal travel with a map for choosing destinations, Personal, Public, Invite, Clan and Tagged access modes, Steam account and Clan limits, Admin portals, GlobalKey gates, favorites, cooldowns, and optional distance-based Coin fares.",
   "dependencies": [
-    "denikson-BepInExPack_Valheim-5.4.2333",
-    "ValheimModding-Jotunn-2.29.0"
+    "denikson-BepInExPack_Valheim-5.4.2350"
   ]
 }

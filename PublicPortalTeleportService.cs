@@ -1292,7 +1292,7 @@ internal static partial class PublicPortalTeleportService
             return false;
         }
 
-        return sourceAllowsAllItems || player.IsTeleportable();
+        return player.IsTeleportable(sourceAllowsAllItems);
     }
 
     private static long NextRequestId()

@@ -86,7 +86,7 @@ internal static class PublicPortalTaggedConnections
                 return;
             }
 
-            foreach (ZDO portal in ZDOMan.instance.GetPortals())
+            foreach (ZDO portal in ZDOMan.instance.GetPortalList())
             {
                 ZDOID connection = portal.GetConnectionZDOID(ZDOExtraData.ConnectionType.Portal);
                 if (connection == ZDOID.None)

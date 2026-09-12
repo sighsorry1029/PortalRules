@@ -4,6 +4,10 @@ PortalRules adds map-based portal travel, access modes, portal limits, Admin por
 
 The server filters the portal catalog for each player and authorizes every handled trip. Clients receive catalog entries only for portals they are allowed to use.
 
+This source targets Valheim 1.0.7 and BepInExPack Valheim 5.4.2350. Jotunn is no longer required by PortalRules. Other installed mods may still require it. Install PortalRules on the server and clients; its existing ServerSync configuration/version checks remain in place.
+
+All-items portals bypass ordinary material restrictions, while respecting Valheim's absolute item restrictions. Blocked travel is rejected before opening the destination map. Implementation details and the remaining in-game validation checklist are in [the 1.0.7 compatibility notes](docs/valheim-1.0.7.md).
+
 ## Showcase
 
 ### Portal map and favorites
