@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading;
 using BepInEx;
 using BepInEx.Configuration;
@@ -33,10 +34,18 @@ public class PortalRulesPlugin : BaseUnityPlugin
     public static readonly ManualLogSource PortalRulesLogger = BepInEx.Logging.Logger.CreateLogSource(ModName);
     private static readonly ConfigSync ConfigSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
     private FileSystemWatcher? _watcher;
-    private readonly object _reloadLock = new();
-    private DateTime _lastConfigReloadTime;
+    private bool _configPersistenceActive;
+    private bool _originalSaveOnConfigSet;
+    private bool _configSavePending;
+    private bool _configReloadPending;
+    private bool _processingConfigReload;
+    private float _configSaveAt;
+    private float _configReloadAt;
+    private string _knownConfigFingerprint = "";
     private int _clanRegistryDirty;
-    private const long RELOAD_DELAY = 10000000; // One second
+    private const float ConfigSaveDebounceSeconds = 0.5f;
+    private const float ConfigReloadDebounceSeconds = 0.25f;
+    private const float ConfigIoRetrySeconds = 1f;
 
     public enum Toggle
     {
@@ -47,7 +56,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
     public void Awake()
     {
         Game.isModded = true;
-        bool saveOnSet = Config.SaveOnConfigSet;
+        _originalSaveOnConfigSet = Config.SaveOnConfigSet;
         Config.SaveOnConfigSet = false;
         try
         {
@@ -68,13 +77,17 @@ public class PortalRulesPlugin : BaseUnityPlugin
             ClanPortalAccess.Initialize();
             _harmony.PatchAll(assembly);
             Config.Save();
+            RememberCurrentConfigFingerprint();
+            Config.SettingChanged += OnConfigSettingChanged;
+            _configPersistenceActive = true;
+            SetupWatcher();
         }
-        finally
+        catch
         {
-            Config.SaveOnConfigSet = saveOnSet;
+            Config.SettingChanged -= OnConfigSettingChanged;
+            Config.SaveOnConfigSet = _originalSaveOnConfigSet;
+            throw;
         }
-
-        SetupWatcher();
     }
 
     private void Update()
@@ -92,6 +105,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
         PublicPortalCatalog.TickIdentityRegistry();
         AdminPortalPrefabManager.Tick();
         PublicPortalMapController.Instance.Tick();
+        TickConfigPersistence();
         if (Interlocked.Exchange(ref _clanRegistryDirty, 0) != 0)
         {
             PublicPortalCatalog.RefreshClanViews();
@@ -102,17 +116,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
     {
         try
         {
-            TryCleanup("configuration watcher", () =>
-            {
-                if (_watcher == null)
-                {
-                    return;
-                }
-
-                _watcher.EnableRaisingEvents = false;
-                _watcher.Dispose();
-                _watcher = null;
-            });
+            TryCleanup("configuration persistence", ShutdownConfigPersistence);
             TryCleanup("portal map", PublicPortalMapController.Instance.End);
             TryCleanup("connected portal HUD", PublicPortalConnectedHud.Shutdown);
             TryCleanup("portal catalog", PublicPortalCatalog.Shutdown);
@@ -125,7 +129,6 @@ public class PortalRulesPlugin : BaseUnityPlugin
             TryCleanup("Clan event subscription", () =>
                 ClanPortalAccess.RegistryChanged -= OnClanRegistryChanged);
             TryCleanup("Clan integration", ClanPortalAccess.Shutdown);
-            TryCleanup("configuration save", () => SaveWithRespectToConfigSet());
         }
         finally
         {
@@ -163,52 +166,176 @@ public class PortalRulesPlugin : BaseUnityPlugin
 
     private void ReadConfigValues(object sender, FileSystemEventArgs e)
     {
-        DateTime now = DateTime.Now;
-        long time = now.Ticks - _lastConfigReloadTime.Ticks;
-        if (time < RELOAD_DELAY)
+        if (!_configPersistenceActive)
         {
             return;
         }
 
-        lock (_reloadLock)
-        {
-            if (!File.Exists(ConfigFileFullPath))
-            {
-                PortalRulesLogger.LogWarning("Config file does not exist. Skipping reload.");
-                return;
-            }
-
-            try
-            {
-                PortalRulesLogger.LogDebug("Reloading configuration...");
-                SaveWithRespectToConfigSet(true);
-                PortalRulesLogger.LogInfo("Configuration reload complete.");
-            }
-            catch (Exception ex)
-            {
-                PortalRulesLogger.LogError($"Error reloading configuration: {ex.Message}");
-            }
-        }
-
-        _lastConfigReloadTime = now;
+        _configReloadPending = true;
+        _configReloadAt =
+            Time.realtimeSinceStartup + ConfigReloadDebounceSeconds;
     }
 
-    private void SaveWithRespectToConfigSet(bool reload = false)
+    private void OnConfigSettingChanged(
+        object sender,
+        SettingChangedEventArgs args)
     {
-        bool originalSaveOnSet = Config.SaveOnConfigSet;
-        Config.SaveOnConfigSet = false;
+        if (!_configPersistenceActive ||
+            _processingConfigReload ||
+            ConfigSync.ProcessingServerUpdate)
+        {
+            return;
+        }
+
+        _configSavePending = true;
+        _configSaveAt =
+            Time.realtimeSinceStartup + ConfigSaveDebounceSeconds;
+    }
+
+    private void TickConfigPersistence()
+    {
+        float now = Time.realtimeSinceStartup;
+        if (_configReloadPending && now >= _configReloadAt)
+        {
+            ReloadConfigIfChanged(now);
+        }
+
+        if (_configSavePending && now >= _configSaveAt)
+        {
+            SaveConfigNow();
+        }
+    }
+
+    private void ReloadConfigIfChanged(float now)
+    {
+        if (!File.Exists(ConfigFileFullPath))
+        {
+            _configReloadPending = false;
+            PortalRulesLogger.LogWarning(
+                "Config file does not exist. Skipping reload.");
+            return;
+        }
+
+        if (!TryGetConfigFingerprint(out string fingerprint))
+        {
+            _configReloadAt = now + ConfigIoRetrySeconds;
+            return;
+        }
+
+        _configReloadPending = false;
+        if (string.Equals(
+                fingerprint,
+                _knownConfigFingerprint,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
         try
         {
-            if (reload)
-            {
-                Config.Reload();
-            }
-
-            Config.Save();
+            PortalRulesLogger.LogDebug("Reloading configuration...");
+            _processingConfigReload = true;
+            Config.Reload();
+            _configSavePending = false;
+            _knownConfigFingerprint =
+                TryGetConfigFingerprint(out string reloadedFingerprint)
+                    ? reloadedFingerprint
+                    : fingerprint;
+            PortalRulesLogger.LogInfo("Configuration reload complete.");
+        }
+        catch (Exception ex)
+        {
+            _configReloadPending = true;
+            _configReloadAt = now + ConfigIoRetrySeconds;
+            PortalRulesLogger.LogError(
+                $"Error reloading configuration: {ex.Message}");
         }
         finally
         {
-            Config.SaveOnConfigSet = originalSaveOnSet;
+            _processingConfigReload = false;
+        }
+    }
+
+    private void SaveConfigNow()
+    {
+        try
+        {
+            Config.Save();
+            _configSavePending = false;
+            RememberCurrentConfigFingerprint();
+        }
+        catch (Exception ex)
+        {
+            _configSavePending = true;
+            _configSaveAt =
+                Time.realtimeSinceStartup + ConfigIoRetrySeconds;
+            PortalRulesLogger.LogError(
+                $"Error saving configuration: {ex.Message}");
+        }
+    }
+
+    private void RememberCurrentConfigFingerprint()
+    {
+        if (TryGetConfigFingerprint(out string fingerprint))
+        {
+            _knownConfigFingerprint = fingerprint;
+        }
+    }
+
+    private static bool TryGetConfigFingerprint(out string fingerprint)
+    {
+        fingerprint = "";
+        try
+        {
+            using FileStream stream = new(
+                ConfigFileFullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using SHA256 sha256 = SHA256.Create();
+            fingerprint = Convert.ToBase64String(
+                sha256.ComputeHash(stream));
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private void ShutdownConfigPersistence()
+    {
+        try
+        {
+            if (_watcher != null)
+            {
+                _watcher.EnableRaisingEvents = false;
+                _watcher.Dispose();
+                _watcher = null;
+            }
+        }
+        finally
+        {
+            if (_configPersistenceActive)
+            {
+                Config.SettingChanged -= OnConfigSettingChanged;
+                try
+                {
+                    if (_configSavePending)
+                    {
+                        SaveConfigNow();
+                    }
+                }
+                finally
+                {
+                    _configPersistenceActive = false;
+                    Config.SaveOnConfigSet = _originalSaveOnConfigSet;
+                }
+            }
         }
     }
 

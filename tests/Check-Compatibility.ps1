@@ -146,6 +146,43 @@ try {
         if ($hasMin -and $hasMax -and $hasClamp) { $wheelMatches++ }
     }
     if ($wheelMatches -ne 1) { $failures.Add("Unexpected wheel transpiler anchor count: $wheelMatches") }
+    $pluginType = $module.Types | Where-Object FullName -eq 'PortalRules.PortalRulesPlugin'
+    function Method-Calls($method, [string]$declaringType, [string]$name) {
+        @($method.Body.Instructions | Where-Object {
+            $_.Operand -is [Mono.Cecil.MethodReference] -and
+            $_.Operand.DeclaringType.FullName -eq $declaringType -and
+            $_.Operand.Name -eq $name
+        }).Count
+    }
+    $fileChanged = $pluginType.Methods | Where-Object Name -eq 'ReadConfigValues'
+    $reloadConfig = $pluginType.Methods | Where-Object Name -eq 'ReloadConfigIfChanged'
+    $saveConfig = $pluginType.Methods | Where-Object Name -eq 'SaveConfigNow'
+    $settingChanged = $pluginType.Methods | Where-Object Name -eq 'OnConfigSettingChanged'
+    if (!$fileChanged -or !$reloadConfig -or !$saveConfig -or !$settingChanged) {
+        $failures.Add('Config persistence methods are missing')
+    }
+    else {
+        if ((Method-Calls $fileChanged 'BepInEx.Configuration.ConfigFile' 'Save') -ne 0 -or
+            (Method-Calls $fileChanged 'BepInEx.Configuration.ConfigFile' 'Reload') -ne 0) {
+            $failures.Add('Config file watcher performs immediate config I/O')
+        }
+        if ((Method-Calls $reloadConfig 'BepInEx.Configuration.ConfigFile' 'Reload') -ne 1 -or
+            (Method-Calls $reloadConfig 'BepInEx.Configuration.ConfigFile' 'Save') -ne 0) {
+            $failures.Add('Config reload must read once without rewriting the file')
+        }
+        if ((Method-Calls $saveConfig 'BepInEx.Configuration.ConfigFile' 'Save') -ne 1 -or
+            (Method-Calls $saveConfig 'BepInEx.Configuration.ConfigFile' 'Reload') -ne 0) {
+            $failures.Add('Debounced config save must write exactly once')
+        }
+        $checksServerSyncUpdate = @($settingChanged.Body.Instructions | Where-Object {
+            $_.Operand -is [Mono.Cecil.FieldReference] -and
+            $_.Operand.DeclaringType.FullName -eq 'ServerSync.ConfigSync' -and
+            $_.Operand.Name -eq 'ProcessingServerUpdate'
+        }).Count
+        if ($checksServerSyncUpdate -ne 1) {
+            $failures.Add('Config save debounce does not distinguish ServerSync updates')
+        }
+    }
     if ($failures.Count) { throw ($failures -join "`n") }
     [pscustomobject]@{
         GameMemberInstructionsResolved = $references
@@ -156,6 +193,7 @@ try {
         DynamicHammerTargetsChecked = 2
         PrivateFieldContractsChecked = 5
         WheelTranspilerAnchors = $wheelMatches
+        ConfigPersistenceContractsChecked = 4
         Note = 'Static metadata/IL checks; does not install Harmony patches or execute Unity.'
     } | ConvertTo-Json -Depth 4
 }
