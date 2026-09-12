@@ -147,6 +147,7 @@
         <Compile Include="PublicPortalServerPolicy.cs"/>
         <Compile Include="PublicPortalAccess.cs"/>
         <Compile Include="PublicPortalInteraction.cs"/>
+        <Compile Include="PublicPortalInteraction.Lifecycle.cs"/>
         <Compile Include="PublicPortalKinds.cs"/>
         <Compile Include="PublicPortalMap.cs"/>
         <Compile Include="PublicPortalMapController.cs"/>
