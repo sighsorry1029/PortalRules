@@ -56,7 +56,8 @@ internal static class PortalAccountStore
     private const long MaximumIdentityFileBytes = 2L * 1024L * 1024L;
     private const long MaximumOverrideFileBytes = 512L * 1024L;
     private const string DirectoryName = "PortalRules";
-    private const string IdentityFileName = "player-identities.yml";
+    private static string IdentityFileName =>
+        PublicPortalData.IsCrossplay ? "player-identities-playfab.yml" : "player-identities.yml";
     private const string OverrideFileName = "portal-limit-overrides.yml";
 
     private static readonly TimeSpan IdentitySaveDebounce = TimeSpan.FromSeconds(2);
@@ -161,11 +162,11 @@ internal static class PortalAccountStore
                 $"Failed to initialize PortalRules account files: {ex.Message}");
         }
 
-        if (_active && ZNet.m_onlineBackend != OnlineBackendType.Steamworks)
+        if (_active && PublicPortalData.IsCrossplay)
         {
             PortalRulesPlugin.PortalRulesLogger.LogWarning(
-                "PortalRules account attribution is Steam-only. " +
-                "Counted portal placement will fail closed on a non-Steam backend.");
+                "PortalRules uses PlayFab entity ownership in Crossplay. " +
+                "The overall account portal limit is automatically disabled; the saved setting is unchanged.");
         }
     }
 
@@ -293,7 +294,7 @@ internal static class PortalAccountStore
         added = false;
         if (!_active ||
             playerId == 0L ||
-            !PublicPortalData.TryNormalizeSteamId64(steamId, out string canonicalSteamId))
+            !PublicPortalData.TryNormalizeAccountId(steamId, out string canonicalSteamId))
         {
             return false;
         }
@@ -313,7 +314,7 @@ internal static class PortalAccountStore
             ConflictedPlayerIds.Add(playerId);
             PortalRulesPlugin.PortalRulesLogger.LogError(
                 $"Refused identity collision for playerID {playerId}: " +
-                $"stored SteamID64 {existingSteamId}, authenticated SteamID64 {canonicalSteamId}. " +
+                $"stored account {existingSteamId}, authenticated account {canonicalSteamId}. " +
                 "The stored mapping was not overwritten and this playerID is blocked for this session.");
             return false;
         }
@@ -332,7 +333,7 @@ internal static class PortalAccountStore
         return true;
     }
 
-    internal static bool TryResolveSteamId(long playerId, out string steamId)
+    internal static bool TryResolveAccountId(long playerId, out string steamId)
     {
         steamId = "";
         return _active &&
@@ -360,7 +361,7 @@ internal static class PortalAccountStore
 
     internal static int GetEffectiveInvitePortalLimit(string steamId, int defaultLimit)
     {
-        if (!PublicPortalData.TryNormalizeSteamId64(steamId, out string canonicalSteamId))
+        if (!PublicPortalData.TryNormalizeAccountId(steamId, out string canonicalSteamId))
         {
             return 0;
         }
@@ -472,13 +473,13 @@ internal static class PortalAccountStore
                         $"identity key '{pair.Key}' is not a canonical nonzero playerID");
                 }
 
-                if (!PublicPortalData.TryNormalizeSteamId64(
+                if (!PublicPortalData.TryNormalizeAccountId(
                         pair.Value,
                         out string canonicalSteamId) ||
                     !string.Equals(pair.Value, canonicalSteamId, StringComparison.Ordinal))
                 {
                     throw new InvalidDataException(
-                        $"identity value for playerID {pair.Key} is not a bare SteamID64");
+                        $"identity value for playerID {pair.Key} is not a canonical account ID");
                 }
 
                 identities.Add(playerId, canonicalSteamId);

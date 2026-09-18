@@ -43,7 +43,7 @@ try {
                 }
                 if ($operand -isnot [Mono.Cecil.MethodReference] -and $operand -isnot [Mono.Cecil.FieldReference]) { continue }
                 $scope = $operand.DeclaringType.Scope.Name
-                if ($scope -notin @('assembly_valheim', 'assembly_utils', 'assembly_guiutils', 'Splatform')) { continue }
+                if ($scope -notin @('assembly_valheim', 'assembly_utils', 'assembly_guiutils', 'Splatform', 'PlayFab')) { continue }
                 try {
                     $resolved = $operand.Resolve()
                     if (!$resolved) { throw 'Member not found' }

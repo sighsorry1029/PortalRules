@@ -51,6 +51,9 @@ internal static class PublicPortalConfig
     public static ConfigEntry<float> InviteArrivalCooldownHours = null!;
     public static ConfigEntry<int> MaxClanPortalsPerClan = null!;
     public static ConfigEntry<PortalRulesPlugin.Toggle> EnableAccountPortalLimit = null!;
+    internal static bool IsAccountPortalLimitEnabled =>
+        EnableAccountPortalLimit.Value.IsOn() && !PublicPortalData.IsCrossplay;
+
     public static ConfigEntry<int> MaxPortalsPerAccount = null!;
     public static ConfigEntry<string> CountedPortalPrefabs = null!;
     public static ConfigEntry<PublicPortalFareMode> PortalFareMode = null!;
@@ -152,7 +155,7 @@ internal static class PublicPortalConfig
             "Max Invite Portals Per Account",
             1,
             new ConfigDescription(
-                "Maximum player-built portals one authenticated Steam account may keep in Invite mode. -1 is unlimited. An effective value of 0 disables Invite mode and returns existing eligible Invite portals to their immutable Builder's Personal access.",
+                "Maximum player-built portals one authenticated account (Steam on Steamworks, PlayFab entity on Crossplay) may keep in Invite mode. -1 is unlimited. An effective value of 0 disables Invite mode and returns existing eligible Invite portals to their immutable Builder's Personal access.",
                 new AcceptableValueRange<int>(-1, 10000)),
             order: 400,
             categoryOrder: 300);
@@ -161,7 +164,7 @@ internal static class PublicPortalConfig
             "Invite Departure Cooldown Hours",
             1f,
             new ConfigDescription(
-                "Per-Steam-account, per-Invite-portal cooldown after using that portal as the source. 0 disables the departure cooldown.",
+                "Per-authenticated-account (Steam or PlayFab), per-Invite-portal cooldown after using that portal as the source. 0 disables the departure cooldown.",
                 new AcceptableValueRange<float>(0f, 8760f)),
             order: 300,
             categoryOrder: 300);
@@ -170,7 +173,7 @@ internal static class PublicPortalConfig
             "Invite Arrival Cooldown Hours",
             1f,
             new ConfigDescription(
-                "Per-Steam-account, per-Invite-portal cooldown after using that portal as the destination. 0 disables the arrival cooldown.",
+                "Per-authenticated-account (Steam or PlayFab), per-Invite-portal cooldown after using that portal as the destination. 0 disables the arrival cooldown.",
                 new AcceptableValueRange<float>(0f, 8760f)),
             order: 200,
             categoryOrder: 300);
@@ -188,7 +191,7 @@ internal static class PublicPortalConfig
             "4 - Account Portal Limit",
             "Enable Account Portal Limit",
             PortalRulesPlugin.Toggle.Off,
-            "If on, the server limits player-built portals by authenticated SteamID64, across all characters on that Steam account. This requires a Steamworks connection; Crossplay uses PlayFab and cannot verify the required SteamID64. If off, the account limit and every portal_limit override are bypassed; Invite and Clan limits remain active.",
+            "If on, the server limits player-built portals by authenticated SteamID64, across all characters on that Steam account. Automatically disabled during Crossplay/PlayFab sessions regardless of this setting; the saved value is preserved. If off, the account limit and every portal_limit override are bypassed; Invite and Clan limits remain active.",
             order: 300,
             categoryOrder: 200);
         MaxPortalsPerAccount = ConfigEntry(

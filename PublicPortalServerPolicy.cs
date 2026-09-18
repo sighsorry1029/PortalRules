@@ -191,7 +191,7 @@ internal static class PublicPortalServerPolicy
 
     private static QuotaState BuildQuotaState(string steamId)
     {
-        int effectiveLimit = PublicPortalConfig.EnableAccountPortalLimit.Value.IsOff()
+        int effectiveLimit = !PublicPortalConfig.IsAccountPortalLimitEnabled
             ? -1
             : PortalAccountStore.GetEffectivePortalLimit(
                 steamId,
@@ -238,7 +238,7 @@ internal static class PublicPortalServerPolicy
         if (ZNet.instance == null ||
             !ZNet.instance.IsServer() ||
             !PublicPortalCatalog.IsServerReady ||
-            !PublicPortalData.TryNormalizeSteamId64(steamId, out string canonicalSteamId))
+            !PublicPortalData.TryNormalizeAccountId(steamId, out string canonicalSteamId))
         {
             return false;
         }
@@ -290,7 +290,7 @@ internal static class PublicPortalServerPolicy
     {
         if (zdo == null ||
             !IsCountedPortalPrefab(zdo.GetPrefab()) ||
-            PublicPortalConfig.EnableAccountPortalLimit.Value.IsOff())
+            !PublicPortalConfig.IsAccountPortalLimitEnabled)
         {
             return true;
         }
@@ -341,7 +341,9 @@ internal static class PublicPortalServerPolicy
             zdo,
             sourcePeer,
             new PortalRulesMessage(
-                "$sighsorry_portalrules_portal_placement_account_unverified"));
+                PublicPortalData.IsCrossplay
+                    ? "$sighsorry_portalrules_portal_placement_crossplay_unverified"
+                    : "$sighsorry_portalrules_portal_placement_account_unverified"));
     }
 
     internal static void RejectPortal(
@@ -386,7 +388,7 @@ internal static class PublicPortalServerPolicy
     {
         message = "";
         if (piece == null ||
-            PublicPortalConfig.EnableAccountPortalLimit.Value.IsOff() ||
+            !PublicPortalConfig.IsAccountPortalLimitEnabled ||
             !IsCountedPortalPrefab(Utils.GetPrefabName(piece.gameObject).GetStableHashCode()))
         {
             return false;
@@ -397,13 +399,6 @@ internal static class PublicPortalServerPolicy
             IsInfinityHammerNoCreatorActive())
         {
             return false;
-        }
-
-        if (ZNet.m_onlineBackend != OnlineBackendType.Steamworks)
-        {
-            message = PortalRulesLocalization.Translate(
-                "$sighsorry_portalrules_portal_limit_crossplay_unsupported");
-            return true;
         }
 
         string syncMessage = PortalRulesLocalization.Translate(

@@ -227,6 +227,16 @@ internal static class PublicPortalMap
         }
     }
 
+    [HarmonyPatch(typeof(GameCamera), nameof(GameCamera.UpdateMouseCapture))]
+    private static class PortalSelectionCursorPatch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix()
+        {
+            PublicPortalMapController.Instance.EnsureSelectionCursor();
+        }
+    }
+
     [HarmonyPatch(typeof(Minimap), nameof(Minimap.SetMapMode))]
     private static class CloseSelectionOnMapClosePatch
     {

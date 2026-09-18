@@ -146,9 +146,11 @@ Public expiry uses an absolute UTC deadline, so server downtime and unloaded reg
 
 Disabling `Enable Account Portal Limit` bypasses only the overall account limit and `portal_limit` overrides. Invite and Clan limits remain active.
 
-The account portal limit requires a Steamworks connection and is Off by default. If it is explicitly enabled for a Crossplay/PlayFab session, placement of counted portal prefabs is blocked with guidance to disable Crossplay or the account limit. Existing configuration files keep their saved value.
+The account portal limit is Off by default and automatically inactive during Crossplay/PlayFab sessions, even if the saved setting is On. The saved value is preserved for Steamworks sessions. This applies to placement checks, server enforcement, and displayed limits.
 
-Overall and Invite limits are shared by every character on the authenticated Steam account. The configurable default counted prefabs are `portal_wood`, `portal`, and `portal_stone`; Admin portals and normal portals with neither a valid Builder nor a creator ID are excluded. Lowering the overall limit never destroys existing portals.
+Crossplay portal ownership uses the connected PlayFab entity identity, not the platform ID reported by a remote client. Personal ownership, Builder editing, Invite limits, cooldowns, and travel authorization use that same identity. Failed placement identity verification includes Crossplay guidance on the second line. Steam and PlayFab ownership remain separate: switching backends does not transfer existing portals or merge accounts. The optional Clan integration still requires its existing verified Steam identity for remote membership lookup; this change does not grant Clan access or remote administrator privileges through a client-reported platform ID.
+
+Overall limits are shared by every character on the authenticated Steam account. Invite limits remain active and are shared by authenticated account (Steam on Steamworks, PlayFab entity on Crossplay). The configurable default counted prefabs are `portal_wood`, `portal`, and `portal_stone`; Admin portals and normal portals with neither a valid Builder nor a creator ID are excluded. Lowering the overall limit never destroys existing portals.
 
 ## Portal map and favorites
 
@@ -195,6 +197,7 @@ PortalRules stores server-only data under `BepInEx/config/PortalRules/`.
 | File | Use |
 |---|---|
 | `player-identities.yml` | Generated character-to-Steam identity registry. Do not edit while running. |
+| `player-identities-playfab.yml` | Generated character-to-PlayFab identity registry for Crossplay; kept separate to preserve Steam mappings. Do not edit while running. |
 | `portal-limit-overrides.yml` | Administrator-edited account and Invite limits; hot-reloaded. |
 | `invite-travel-cooldowns.yml` | Generated per-world cooldown history. Do not edit while running. |
 | `admin-portal-biome-global-keys.yml` | Administrator-edited biome defaults for new Admin portals; hot-reloaded. |
@@ -209,6 +212,8 @@ overrides:
 ```
 
 The first value is `portal_limit`. The optional second value is `invite_limit`; when omitted, it follows the global Invite setting.
+
+Override keys remain SteamID64 values. Crossplay uses the global Invite limit; Steam overrides do not apply to PlayFab identities.
 
 Values are `-1` for unlimited, `0` to block or disable, or `1..10000` for a custom limit.
 

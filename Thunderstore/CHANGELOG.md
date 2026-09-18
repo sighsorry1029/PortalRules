@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8
+
+- Added Crossplay portal ownership based on the authenticated PlayFab entity, covering placement, Builder editing, Personal access, Invite limits and cooldowns, and travel authorization. Steam and PlayFab ownership remain separate.
+- Automatically disables the overall account portal limit during Crossplay without changing its saved setting, while keeping Invite and Clan rules independent.
+- Added a second-line Crossplay diagnostic when portal placement identity verification fails, and a separate PlayFab character identity registry for safe persistence across reconnects.
+- Kept the mouse cursor visible and unlocked when the portal destination map opens after remote server approval.
+
 ## 1.0.7
 
 - Changed the account portal limit default to Off for new configurations while preserving existing saved values.

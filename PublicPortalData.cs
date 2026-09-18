@@ -268,7 +268,7 @@ internal static class PublicPortalData
     {
         string id = _serverAssignedOwnerId;
         if (string.IsNullOrWhiteSpace(id) &&
-            TryGetLocalSteamId64(out string steamId))
+            TryGetLocalAccountId(out string steamId))
         {
             id = steamId;
         }
@@ -296,7 +296,7 @@ internal static class PublicPortalData
     public static bool TryGetPeerOwner(ZNetPeer? peer, out PortalOwner owner)
     {
         owner = new PortalOwner("", "");
-        if (!TryGetPeerSteamId64(peer, out string steamId))
+        if (!TryGetPeerAccountId(peer, out string steamId))
         {
             return false;
         }
@@ -325,6 +325,69 @@ internal static class PublicPortalData
             SteamPlatform(ZNet.instance),
             hostName);
         return TryNormalizeSteamId64(platformUserId.ToString(), out steamId);
+    }
+
+    internal static bool IsCrossplay =>
+        ZNet.m_onlineBackend == OnlineBackendType.PlayFab;
+
+    internal static bool TryGetPeerAccountId(ZNetPeer? peer, out string accountId)
+    {
+        accountId = "";
+        if (!IsCrossplay)
+        {
+            return TryGetPeerSteamId64(peer, out accountId);
+        }
+
+        // GetHostName() is a platform ID supplied by the remote client on PlayFab.
+        // The accepted Party socket's entity instead comes from PlayFabPlayer.EntityKey.
+        return ZNet.instance != null && ZNet.instance.IsServer() &&
+               peer != null && peer.IsReady() &&
+               peer.m_socket is ZPlayFabSocket socket && socket.IsConnected() &&
+               TryNormalizePlayFabEntityId(socket.m_remotePlayerId, out accountId);
+    }
+
+    internal static bool TryGetLocalAccountId(out string accountId)
+    {
+        accountId = "";
+        if (!IsCrossplay)
+        {
+            return TryGetLocalSteamId64(out accountId);
+        }
+
+        return PlayFabManager.IsLoggedIn &&
+               TryNormalizePlayFabEntityId(PlayFabManager.instance.Entity?.Id, out accountId);
+    }
+
+    internal static bool TryNormalizePlayFabEntityId(string? entityId, out string accountId)
+    {
+        accountId = "";
+        // Title-player entity IDs are hexadecimal; keep a bounded, distinct namespace.
+        if (entityId == null || entityId.Length == 0 || entityId.Length > 64)
+        {
+            return false;
+        }
+
+        foreach (char c in entityId)
+        {
+            if (!Uri.IsHexDigit(c))
+            {
+                return false;
+            }
+        }
+
+        accountId = "PlayFab_" + entityId.ToUpperInvariant();
+        return true;
+    }
+
+    internal static bool TryNormalizeAccountId(string? value, out string accountId)
+    {
+        const string prefix = "PlayFab_";
+        if (value != null && value.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return TryNormalizePlayFabEntityId(value.Substring(prefix.Length), out accountId);
+        }
+
+        return TryNormalizeSteamId64(value, out accountId);
     }
 
     internal static bool TryGetLocalSteamId64(out string steamId)

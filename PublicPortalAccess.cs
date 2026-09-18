@@ -105,7 +105,7 @@ internal static class PublicPortalAccess
         }
 
         bool requesterIsBuilder =
-            PublicPortalData.TryGetLocalSteamId64(out string steamId) &&
+            PublicPortalData.TryGetLocalAccountId(out string steamId) &&
             string.Equals(
                 steamId,
                 builder.AccountId,

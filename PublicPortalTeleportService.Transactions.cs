@@ -305,7 +305,7 @@ internal static partial class PublicPortalTeleportService
             destinationId.IsNone() ||
             sourceId == destinationId ||
             authorization.CoinCost < 0 ||
-            !PublicPortalData.TryNormalizeSteamId64(
+            !PublicPortalData.TryNormalizeAccountId(
                 authorization.AccountId,
                 out string accountId) ||
             !PublicPortalData.TryNormalizeFavoriteId(
@@ -351,7 +351,7 @@ internal static partial class PublicPortalTeleportService
             if (peer == null ||
                 peer.m_uid != peerUid ||
                 !peer.IsReady() ||
-                !PublicPortalData.TryGetPeerSteamId64(peer, out string steamId) ||
+                !PublicPortalData.TryGetPeerAccountId(peer, out string steamId) ||
                 !string.Equals(steamId, accountId, StringComparison.Ordinal))
             {
                 return false;
@@ -463,7 +463,7 @@ internal static partial class PublicPortalTeleportService
         if (authenticatedPeer == null ||
             authenticatedPeer.m_uid != ticket.PeerUid ||
             !authenticatedPeer.IsReady() ||
-            !PublicPortalData.TryGetPeerSteamId64(
+            !PublicPortalData.TryGetPeerAccountId(
                 authenticatedPeer,
                 out string steamId) ||
             !string.Equals(

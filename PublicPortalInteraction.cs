@@ -339,10 +339,10 @@ internal static partial class PublicPortalInteraction
         appliedMode = currentMode;
         string requesterSteamId;
         bool requesterIdentityResolved = requesterPeer != null
-            ? PublicPortalData.TryGetPeerSteamId64(
+            ? PublicPortalData.TryGetPeerAccountId(
                 requesterPeer,
                 out requesterSteamId)
-            : PublicPortalData.TryGetLocalSteamId64(
+            : PublicPortalData.TryGetLocalAccountId(
                 out requesterSteamId);
         bool requesterIsBuilder =
             requesterIdentityResolved &&

@@ -638,7 +638,7 @@ internal static partial class PublicPortalCatalog
         steamId = "";
         if (ZNet.instance == null ||
             !ZNet.instance.IsServer() ||
-            !PublicPortalData.TryGetPeerSteamId64(peer, out steamId) ||
+            !PublicPortalData.TryGetPeerAccountId(peer, out steamId) ||
             !PublicPortalData.TryGetAuthenticatedPeerPlayerId(peer, out long playerId) ||
             !PortalAccountStore.TryRememberIdentity(playerId, steamId, out bool added))
         {
@@ -661,7 +661,7 @@ internal static partial class PublicPortalCatalog
         if (ZNet.instance == null ||
             !ZNet.instance.IsServer() ||
             player == null ||
-            !PublicPortalData.TryGetLocalSteamId64(out steamId))
+            !PublicPortalData.TryGetLocalAccountId(out steamId))
         {
             steamId = "";
             return false;
@@ -1094,7 +1094,7 @@ internal static partial class PublicPortalCatalog
 
     internal static int GetBuilderPortalCount(string builderAccountId)
     {
-        if (!PublicPortalData.TryNormalizeSteamId64(
+        if (!PublicPortalData.TryNormalizeAccountId(
                 builderAccountId,
                 out string normalizedBuilderId) ||
             !ServerPortalsByBuilder.TryGetValue(normalizedBuilderId, out HashSet<ZDOID> portalIds))
@@ -1120,7 +1120,7 @@ internal static partial class PublicPortalCatalog
 
     internal static int GetBuilderInvitePortalCount(string builderAccountId)
     {
-        if (!PublicPortalData.TryNormalizeSteamId64(
+        if (!PublicPortalData.TryNormalizeAccountId(
                 builderAccountId,
                 out string normalizedBuilderId) ||
             !ServerPortalsByBuilder.TryGetValue(
@@ -1906,7 +1906,7 @@ internal static partial class PublicPortalCatalog
 
         long creatorPlayerId = portal.GetLong(ZDOVars.s_creator, 0L);
         if (creatorPlayerId == 0L ||
-            !PortalAccountStore.TryResolveSteamId(
+            !PortalAccountStore.TryResolveAccountId(
                 creatorPlayerId,
                 out string steamId))
         {
@@ -1955,7 +1955,7 @@ internal static partial class PublicPortalCatalog
     {
         if (playerId == 0L ||
             ZDOMan.instance == null ||
-            !PublicPortalData.TryNormalizeSteamId64(steamId, out string canonicalSteamId))
+            !PublicPortalData.TryNormalizeAccountId(steamId, out string canonicalSteamId))
         {
             return;
         }
@@ -2669,7 +2669,7 @@ internal static partial class PublicPortalCatalog
     {
         Dictionary<ZDOID, int> myPortalOrdinals = new();
         int myPortalLimit = 0;
-        if (PublicPortalData.TryNormalizeSteamId64(
+        if (PublicPortalData.TryNormalizeAccountId(
                 recipient.OwnerId,
                 out string recipientAccountId))
         {
@@ -2689,7 +2689,7 @@ internal static partial class PublicPortalCatalog
                 myPortalOrdinals[mine[i].Key] = i + 1;
             }
 
-            myPortalLimit = PublicPortalConfig.EnableAccountPortalLimit.Value.IsOff()
+            myPortalLimit = !PublicPortalConfig.IsAccountPortalLimitEnabled
                 ? -1
                 : PortalAccountStore.GetEffectivePortalLimit(
                     recipientAccountId,
@@ -3384,7 +3384,7 @@ internal static partial class PublicPortalCatalog
             if (!PublicPortalData.TryGetAuthenticatedPeerPlayerId(
                     peer,
                     out long expectedPlayerId) ||
-                !PublicPortalData.TryGetPeerSteamId64(peer, out string steamId))
+                !PublicPortalData.TryGetPeerAccountId(peer, out string steamId))
             {
                 return false;
             }
@@ -3424,7 +3424,7 @@ internal static partial class PublicPortalCatalog
             if (localPlayerId == 0L ||
                 creatorPlayerId == 0L ||
                 creatorPlayerId != localPlayerId ||
-                !PortalAccountStore.TryResolveSteamId(
+                !PortalAccountStore.TryResolveAccountId(
                     localPlayerId,
                     out string steamId) ||
                 !string.Equals(
@@ -3697,7 +3697,7 @@ internal static partial class PublicPortalCatalog
 
     private static PortalBuilder SanitizeBuilder(PortalBuilder builder)
     {
-        string accountId = PublicPortalData.TryNormalizeSteamId64(
+        string accountId = PublicPortalData.TryNormalizeAccountId(
             builder.AccountId,
             out string canonicalSteamId)
             ? canonicalSteamId

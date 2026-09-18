@@ -145,8 +145,31 @@ internal sealed class PublicPortalMapController
 
         OpenMapAt(sourcePortal.transform.position);
         InventoryGui.instance?.Hide();
+        EnsureSelectionCursor();
 
         SetAccessiblePortalPinsVisible(visible: true, showMessage: false);
+    }
+
+    internal void EnsureSelectionCursor()
+    {
+        Minimap? minimap = Minimap.instance;
+        if (!IsSelecting || Player.m_localPlayer == null ||
+            minimap == null || minimap.m_mode != Minimap.MapMode.Large ||
+            minimap.m_largeRoot == null || !minimap.m_largeRoot.activeInHierarchy ||
+            !ZInput.IsMouseActive())
+        {
+            return;
+        }
+
+        // Approval can open the map outside the normal map-key update. Reassert
+        // this after the camera's capture update as well; a one-time unlock can
+        // otherwise be overwritten later in the frame. ZCursor preserves the
+        // game's hardware/virtual/touch cursor rules, unlike Cursor.visible.
+        if (ZCursor.LockState != CursorLockMode.None)
+        {
+            ZCursor.LockState = CursorLockMode.None;
+        }
+        ZCursor.Show();
     }
 
     public void Tick()
@@ -452,9 +475,15 @@ internal sealed class PublicPortalMapController
         }
 
         bool previousNoMap = Game.m_noMap;
-        Game.m_noMap = false;
-        Minimap.instance.ShowPointOnMap(position);
-        Game.m_noMap = previousNoMap;
+        try
+        {
+            Game.m_noMap = false;
+            Minimap.instance.ShowPointOnMap(position);
+        }
+        finally
+        {
+            Game.m_noMap = previousNoMap;
+        }
     }
 
     private static PublicPortalCatalogEntry ResolveSourcePortalEntry(

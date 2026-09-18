@@ -82,6 +82,10 @@
         <Reference Include="Splatform">
             <HintPath>$(CorlibPath)\Splatform.dll</HintPath>
         </Reference>
+        <Reference Include="PlayFab">
+            <HintPath>$(CorlibPath)\PlayFab.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="System"/>
         <Reference Include="System.Core"/>
         <Reference Include="System.Data"/>
