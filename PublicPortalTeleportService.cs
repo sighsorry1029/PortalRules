@@ -283,12 +283,7 @@ internal static partial class PublicPortalTeleportService
             return;
         }
 
-        LastRequestAt.Clear();
-        LastAcceptedRequestId.Clear();
-        LastControlRequestAt.Clear();
-        ClearServerTickets();
-        CancelPending();
-        _pendingCommit = null;
+        Shutdown();
         _sessionZNet = znet;
     }
 

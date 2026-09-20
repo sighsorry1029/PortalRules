@@ -55,3 +55,14 @@ $cursorFixture = $cursorFixture.Replace('/* CURSOR_METHOD */',
     (Read-Method 'PublicPortalMapController.cs' 'OpenMapAt'))
 Add-Type -TypeDefinition $cursorFixture
 [PortalRulesMapCursorChecks.Checks]::Run()
+
+$lifecycleMethods = @(
+    (Read-Method 'PublicPortalTeleportService.cs' 'BeginNetworkSession'),
+    (Read-Method 'PublicPortalTeleportService.cs' 'Shutdown'),
+    (Read-Method 'PublicPortalTeleportService.cs' 'CancelPending'),
+    (Read-Method 'PublicPortalTeleportService.Transactions.cs' 'ClearServerTickets'),
+    (Read-Method 'PublicPortalTeleportService.Transactions.cs' 'CancelServerTicket')
+) -join "`n"
+$lifecycleFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'TravelLifecycleChecks.cs'))
+Add-Type -TypeDefinition ($lifecycleFixture.Replace('/* PRODUCTION_METHODS */', $lifecycleMethods))
+[PortalRulesTravelLifecycleChecks]::Run()
