@@ -650,6 +650,7 @@ internal sealed class PublicPortalFavoritePanel
         FavoriteFareState fareState,
         Sprite? coinIcon)
     {
+        // CreateButton calls this only for a positive fare without an arrival cooldown.
         GameObject infoRoot = new("TravelInfo", typeof(RectTransform));
         infoRoot.transform.SetParent(parent, false);
         RectTransform infoRect = (RectTransform)infoRoot.transform;
@@ -659,47 +660,44 @@ internal sealed class PublicPortalFavoritePanel
         infoRect.anchoredPosition = new Vector2(-8f, 0f);
 
         float cursor = 0f;
-        if (travelCost > 0)
+        if (coinIcon != null)
         {
-            if (coinIcon != null)
-            {
-                GameObject iconObject = new(
-                    "CoinsIcon",
-                    typeof(RectTransform),
-                    typeof(Image));
-                iconObject.transform.SetParent(infoRoot.transform, false);
-                RectTransform iconRect = (RectTransform)iconObject.transform;
-                SetLeftAlignedRect(iconRect, cursor, 20f);
+            GameObject iconObject = new(
+                "CoinsIcon",
+                typeof(RectTransform),
+                typeof(Image));
+            iconObject.transform.SetParent(infoRoot.transform, false);
+            RectTransform iconRect = (RectTransform)iconObject.transform;
+            SetLeftAlignedRect(iconRect, cursor, 20f);
 
-                Image icon = iconObject.GetComponent<Image>();
-                icon.sprite = coinIcon;
-                icon.preserveAspect = true;
-                icon.raycastTarget = false;
-                cursor += 24f;
-            }
-
-            string costText = coinIcon != null
-                ? PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_quantity",
-                    travelCost.ToString())
-                : PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_coins_quantity",
-                    travelCost.ToString());
-            Text count = CreateLabel(
-                infoRoot.transform,
-                costText,
-                12,
-                FontStyle.Bold);
-            count.alignment = TextAnchor.MiddleLeft;
-            count.horizontalOverflow = HorizontalWrapMode.Overflow;
-            count.color = fareState.LocalCoinCount >= travelCost
-                ? Color.white
-                : UnaffordableColor;
-            count.raycastTarget = false;
-            float countWidth = Mathf.Ceil(count.preferredWidth) + 2f;
-            SetLeftAlignedRect((RectTransform)count.transform, cursor, countWidth);
-            cursor += countWidth;
+            Image icon = iconObject.GetComponent<Image>();
+            icon.sprite = coinIcon;
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            cursor += 24f;
         }
+
+        string costText = coinIcon != null
+            ? PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_quantity",
+                travelCost.ToString())
+            : PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_coins_quantity",
+                travelCost.ToString());
+        Text count = CreateLabel(
+            infoRoot.transform,
+            costText,
+            12,
+            FontStyle.Bold);
+        count.alignment = TextAnchor.MiddleLeft;
+        count.horizontalOverflow = HorizontalWrapMode.Overflow;
+        count.color = fareState.LocalCoinCount >= travelCost
+            ? Color.white
+            : UnaffordableColor;
+        count.raycastTarget = false;
+        float countWidth = Mathf.Ceil(count.preferredWidth) + 2f;
+        SetLeftAlignedRect((RectTransform)count.transform, cursor, countWidth);
+        cursor += countWidth;
 
         infoRect.sizeDelta = new Vector2(cursor, 22f);
         return cursor;

@@ -604,11 +604,9 @@ internal sealed class PublicPortalPinController
         int localCoinCount,
         Sprite? sharedCoinIcon)
     {
+        // UpdateTravelBadges hides free routes before calling this renderer.
         float cursor = 0f;
-        bool hasCost = travelCost > 0;
-        Sprite? coinIcon = hasCost
-            ? badge.CoinIcon.sprite ?? sharedCoinIcon
-            : null;
+        Sprite? coinIcon = badge.CoinIcon.sprite ?? sharedCoinIcon;
         bool showCoinIcon = coinIcon != null;
         badge.CoinIcon.gameObject.SetActive(showCoinIcon);
         if (showCoinIcon)
@@ -618,23 +616,20 @@ internal sealed class PublicPortalPinController
             cursor += 22f;
         }
 
-        badge.CostText.gameObject.SetActive(hasCost);
-        if (hasCost)
-        {
-            badge.CostText.text = showCoinIcon
-                ? PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_quantity",
-                    travelCost.ToString())
-                : PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_coins_quantity",
-                    travelCost.ToString());
-            badge.CostText.color = localCoinCount >= travelCost
-                ? Color.white
-                : UnaffordableColor;
-            float costWidth = Mathf.Ceil(badge.CostText.preferredWidth) + 2f;
-            SetLeftAlignedRect(badge.CostTextRect, cursor, costWidth);
-            cursor += costWidth;
-        }
+        badge.CostText.gameObject.SetActive(true);
+        badge.CostText.text = showCoinIcon
+            ? PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_quantity",
+                travelCost.ToString())
+            : PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_coins_quantity",
+                travelCost.ToString());
+        badge.CostText.color = localCoinCount >= travelCost
+            ? Color.white
+            : UnaffordableColor;
+        float costWidth = Mathf.Ceil(badge.CostText.preferredWidth) + 2f;
+        SetLeftAlignedRect(badge.CostTextRect, cursor, costWidth);
+        cursor += costWidth;
 
         badge.RootRect.sizeDelta = new Vector2(cursor, 20f);
     }
