@@ -501,16 +501,19 @@ internal static partial class PublicPortalCatalog
                     return;
                 }
 
+                PublicPortalAccessMode initialMode = ResolveNewPlayerPortalMode(
+                    sanitizedBuilder,
+                    out string authorizedClanId);
                 authority = new ServerPortalAuthority(
-                    PublicPortalAccessMode.Personal,
+                    initialMode,
                     SanitizeOwner(owner),
-                    "",
+                    authorizedClanId,
                     sanitizedBuilder,
                     zdo.GetPrefab(),
                     CreateServerFavoriteId(),
                     "",
                     CreateTemporaryPublicExpirationUtcSeconds(
-                        PublicPortalAccessMode.Personal,
+                        initialMode,
                         sanitizedBuilder,
                         zdo.GetPrefab()));
             }
@@ -2017,6 +2020,44 @@ internal static partial class PublicPortalCatalog
                 $"to SteamID64 {canonicalSteamId}.");
             MarkServerCatalogDirty();
         }
+    }
+
+    // Called only after a new ordinary player's placement passes server validation.
+    // Loaded and creatorless portals follow their existing initialization paths.
+    private static PublicPortalAccessMode ResolveNewPlayerPortalMode(
+        PortalBuilder builder,
+        out string authorizedClanId)
+    {
+        authorizedClanId = "";
+        if (!builder.IsValid)
+        {
+            return PublicPortalAccessMode.Personal;
+        }
+
+        PublicPortalDefaultMode configuredMode = PublicPortalConfig.DefaultPortalMode.Value;
+        if (configuredMode == PublicPortalDefaultMode.Public)
+        {
+            return PublicPortalAccessMode.Public;
+        }
+
+        if (configuredMode != PublicPortalDefaultMode.Clan ||
+            !ClanPortalAccess.IsServerRegistryAvailable ||
+            !ClanPortalAccess.TryResolveBuilderMembership(builder, out PortalClanMembership membership) ||
+            !membership.HasPrimaryClan)
+        {
+            return PublicPortalAccessMode.Personal;
+        }
+
+        string clanId = SanitizeClanId(membership.PrimaryClanId);
+        if (clanId.Length == 0 ||
+            !PublicPortalServerPolicy.TryGetClanQuotaState(clanId, out int currentCount, out int effectiveLimit) ||
+            (effectiveLimit >= 0 && currentCount >= effectiveLimit))
+        {
+            return PublicPortalAccessMode.Personal;
+        }
+
+        authorizedClanId = clanId;
+        return PublicPortalAccessMode.Clan;
     }
 
     private static ServerPortalAuthority CreateAuthorityForNewPortal(ZDO portal)

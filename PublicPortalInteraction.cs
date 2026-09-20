@@ -61,11 +61,12 @@ internal static partial class PublicPortalInteraction
 
         return mode switch
         {
-            PublicPortalAccessMode.Personal => PublicPortalAccessMode.Admin,
+            PublicPortalAccessMode.Personal => PublicPortalAccessMode.Clan,
+            PublicPortalAccessMode.Clan => PublicPortalAccessMode.Public,
+            // Allow existing ordinary Admin portals to leave their saved mode.
             PublicPortalAccessMode.Admin => PublicPortalAccessMode.Public,
             PublicPortalAccessMode.Public => PublicPortalAccessMode.Invite,
-            PublicPortalAccessMode.Invite => PublicPortalAccessMode.Clan,
-            PublicPortalAccessMode.Clan => PublicPortalAccessMode.Tagged,
+            PublicPortalAccessMode.Invite => PublicPortalAccessMode.Tagged,
             PublicPortalAccessMode.Tagged => PublicPortalAccessMode.Personal,
             _ => PublicPortalAccessMode.Personal
         };
@@ -449,7 +450,7 @@ internal static partial class PublicPortalInteraction
         authorizedClanId = "";
         authorizedClanName = "";
 
-        int candidateCount = isAdminPortal ? 3 : 6;
+        int candidateCount = isAdminPortal ? 3 : 5;
         for (int i = 0; i < candidateCount; i++)
         {
             authorizedClanId = "";

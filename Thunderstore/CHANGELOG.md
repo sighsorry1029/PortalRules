@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.9
+
+- Added the server-synchronized `Default Portal Mode` setting for newly placed ordinary player portals, with `Personal`, `Clan`, and `Public` choices. Clan safely falls back to Personal when membership or quota cannot be confirmed, while Public follows the existing expiration rule.
+- Changed ordinary portal mode cycling to `Personal → Clan → Public → Invite → Tagged → Personal`; Admin remains available only to Admin portal prefabs, while an existing ordinary Admin-mode portal can still cycle out to Public.
+- Clarified insufficient-fare messages so players know Coins are required because they are carrying items that cannot normally be teleported.
+- Centralized network-session travel cleanup and simplified positive-fare UI rendering without changing authorization, transaction, refund, or display behavior.
+
 ## 1.0.8
 
 - Added Crossplay portal ownership based on the authenticated PlayFab entity, covering placement, Builder editing, Personal access, Invite limits and cooldowns, and travel authorization. Steam and PlayFab ownership remain separate.

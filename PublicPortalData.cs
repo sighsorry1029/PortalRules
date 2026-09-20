@@ -24,6 +24,13 @@ internal enum PublicPortalFareMode
     Pay = 1
 }
 
+internal enum PublicPortalDefaultMode
+{
+    Personal = 0,
+    Clan = 1,
+    Public = 2
+}
+
 internal enum RequiredGlobalKeyValidationFailure
 {
     None = 0,

@@ -66,3 +66,18 @@ $lifecycleMethods = @(
 $lifecycleFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'TravelLifecycleChecks.cs'))
 Add-Type -TypeDefinition ($lifecycleFixture.Replace('/* PRODUCTION_METHODS */', $lifecycleMethods))
 [PortalRulesTravelLifecycleChecks]::Run()
+
+$defaultModeMethods = @(
+    (Read-Method 'PublicPortalCatalog.cs' 'ResolveNewPlayerPortalMode'),
+    (Read-Method 'PublicPortalCatalog.cs' 'SanitizeClanId')
+) -join "`n"
+$portalData = [IO.File]::ReadAllText((Join-Path $ProjectRoot 'PublicPortalData.cs'))
+$modeEnums = foreach ($name in @('PublicPortalAccessMode', 'PublicPortalDefaultMode')) {
+    $enumMatches = [regex]::Matches($portalData, '(?ms)^internal enum ' + $name + '\s*\{.*?^\}')
+    if ($enumMatches.Count -ne 1) { throw "Expected one enum: $name" }
+    $enumMatches[0].Value
+}
+$defaultModeFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'DefaultPortalModeChecks.cs'))
+Add-Type -TypeDefinition ($defaultModeFixture.Replace('/* ENUMS */', ($modeEnums -join "`n")).
+    Replace('/* PRODUCTION_METHODS */', $defaultModeMethods))
+[PortalRulesDefaultModeChecks]::Run()

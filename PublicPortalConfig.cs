@@ -45,6 +45,7 @@ internal static class PublicPortalConfig
     public static ConfigEntry<int> PortalMapWheelZoomMultiplier = null!;
     public static ConfigEntry<PortalRulesPlugin.Toggle> FavoritePortalListCollapsed = null!;
     public static ConfigEntry<KeyboardShortcut> ToggleAccessKey = null!;
+    public static ConfigEntry<PublicPortalDefaultMode> DefaultPortalMode = null!;
     public static ConfigEntry<int> PublicAccessDurationSeconds = null!;
     public static ConfigEntry<int> MaxInvitePortalsPerAccount = null!;
     public static ConfigEntry<float> InviteDepartureCooldownHours = null!;
@@ -139,6 +140,19 @@ internal static class PublicPortalConfig
             "Modifier key held while interacting with a portal to cycle its access mode.",
             synchronizedSetting: false,
             order: 600,
+            categoryOrder: 300);
+
+        DefaultPortalMode = ConfigEntry(
+            "3 - Access Modes",
+            "Default Portal Mode",
+            PublicPortalDefaultMode.Personal,
+            new ConfigDescription(
+                "Initial access mode for newly placed non-Admin player portals. " +
+                "Clan falls back to Personal if the Builder's primary Clan cannot be verified or its portal limit is reached/unavailable. " +
+                "Public uses Public Access Duration Seconds and returns to Personal when it expires. " +
+                "Changes affect future placements only; existing, Admin and creatorless system portals keep their current rules."),
+            synchronizedSetting: true,
+            order: 550,
             categoryOrder: 300);
 
         PublicAccessDurationSeconds = ConfigEntry(

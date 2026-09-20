@@ -108,7 +108,7 @@ sighsorry_portalrules_invite_cooldown_storage_unavailable: "Invite portal cooldo
 sighsorry_portalrules_invite_departure_arrival_cooldown: "Invite departure cooldown: {0}. Invite arrival cooldown: {1}."
 sighsorry_portalrules_move_closer_to_source: "Move closer to the source portal."
 sighsorry_portalrules_move_closer_to_source_retry: "Move closer to the source portal and try again."
-sighsorry_portalrules_need_coins: "You need {0} Coins to use this portal."
+sighsorry_portalrules_need_coins: "You need {0} Coins to teleport with non-teleportable items."
 sighsorry_portalrules_portal_authorization_failed: "Portal travel could not be authorized."
 sighsorry_portalrules_portal_request_rate_limited: "Please wait before using another portal."
 sighsorry_portalrules_portal_data_not_ready: "Portal data is not ready. Please try again."
