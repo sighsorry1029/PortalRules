@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11
+
+- Fixed Crossplay portal placement being cancelled with `Crossplay identity verification failed` in mod combinations that wrap the PlayFab connection through ServerSync. Authenticated PlayFab identity and portal ownership checks remain enforced.
+
 ## 1.0.10
 
 - Respect Valheim's final modded item-teleportability result before PortalRules blocks travel or calculates a fare. Items explicitly allowed by another mod, including absolute-restriction items, can travel without a PortalRules Coin fare while the existing vanilla and fare rules remain unchanged otherwise.

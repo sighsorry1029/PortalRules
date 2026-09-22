@@ -349,7 +349,7 @@ internal static class PublicPortalData
         // The accepted Party socket's entity instead comes from PlayFabPlayer.EntityKey.
         return ZNet.instance != null && ZNet.instance.IsServer() &&
                peer != null && peer.IsReady() &&
-               peer.m_socket is ZPlayFabSocket socket && socket.IsConnected() &&
+               peer.m_socket is ZPlayFabSocket socket && peer.m_socket.IsConnected() &&
                TryNormalizePlayFabEntityId(socket.m_remotePlayerId, out accountId);
     }
 

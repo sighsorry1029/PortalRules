@@ -21,14 +21,32 @@ namespace PortalRulesCrossplayChecks
     public class ZNetPeer
     {
         public bool Ready = true;
-        public object? m_socket;
+        public ISocket? m_socket;
         public bool IsReady() => Ready;
     }
-    public class ZPlayFabSocket
+    public interface ISocket
+    {
+        bool IsConnected();
+    }
+    public class ZPlayFabSocket : ISocket
     {
         public string m_remotePlayerId = "AB1234";
         public bool Connected = true;
         public bool IsConnected() => Connected;
+    }
+    public sealed class BufferingPlayFabSocket : ZPlayFabSocket, ISocket
+    {
+        private readonly ISocket _original;
+        public BufferingPlayFabSocket(ISocket original)
+        {
+            _original = original;
+            Connected = false;
+        }
+        public new bool IsConnected() => _original.IsConnected();
+    }
+    public sealed class OtherSocket : ISocket
+    {
+        public bool IsConnected() => true;
     }
     public class EntityKey { public string? Id; }
     public class PlayFabManager
@@ -118,12 +136,18 @@ namespace PortalRulesCrossplayChecks
             var socket = new ZPlayFabSocket();
             var peer = new ZNetPeer { m_socket = socket };
             Check(PublicPortalData.TryGetPeerAccountId(peer, out id) && id == "PlayFab_AB1234", "Party entity identifies remote user");
+            var bufferingSocket = new BufferingPlayFabSocket(socket);
+            peer.m_socket = bufferingSocket;
+            Check(!((ZPlayFabSocket)bufferingSocket).IsConnected() &&
+                ((ISocket)bufferingSocket).IsConnected(), "ServerSync wrapper exposes connection through ISocket");
+            Check(PublicPortalData.TryGetPeerAccountId(peer, out id) && id == "PlayFab_AB1234", "ServerSync-wrapped Party entity identifies remote user");
+            peer.m_socket = socket;
             Check(!PublicPortalData.TryGetPeerAccountId(null, out _), "Missing peer denied");
             peer.Ready = false;
             Check(!PublicPortalData.TryGetPeerAccountId(peer, out _), "Unready peer denied");
             peer.Ready = true; socket.Connected = false;
             Check(!PublicPortalData.TryGetPeerAccountId(peer, out _), "Disconnected peer denied");
-            socket.Connected = true; peer.m_socket = new object();
+            socket.Connected = true; peer.m_socket = new OtherSocket();
             Check(!PublicPortalData.TryGetPeerAccountId(peer, out _), "Wrong socket transport denied");
             peer.m_socket = socket; socket.m_remotePlayerId = "";
             Check(!PublicPortalData.TryGetPeerAccountId(peer, out _), "Missing entity denied");
