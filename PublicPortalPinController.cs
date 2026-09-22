@@ -271,10 +271,14 @@ internal sealed class PublicPortalPinController
             decoration.MyPortalText.gameObject.SetActive(isMyPortal);
             if (isMyPortal)
             {
-                decoration.MyPortalText.text = PortalRulesLocalization.Translate(
-                    "$sighsorry_portalrules_my_portal_ordinal",
-                    portal.MyPortalOrdinal.ToString(),
-                    FormatLimit(portal.MyPortalLimit));
+                decoration.MyPortalText.text = portal.MyPortalLimit < 0
+                    ? PortalRulesLocalization.Translate(
+                        "$sighsorry_portalrules_my_portal_ordinal_unlimited",
+                        portal.MyPortalOrdinal.ToString())
+                    : PortalRulesLocalization.Translate(
+                        "$sighsorry_portalrules_my_portal_ordinal",
+                        portal.MyPortalOrdinal.ToString(),
+                        portal.MyPortalLimit.ToString());
             }
 
             decoration.FavoriteStar.gameObject.SetActive(

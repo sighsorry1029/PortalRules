@@ -229,7 +229,7 @@ internal static class PublicPortalConfig
             "5 - Portal Travel Costs",
             "Portal Fare Mode",
             ReadLegacyFareModeDefault(config.ConfigFilePath),
-            "Off keeps Valheim's normal item teleport restrictions. Pay lets ordinary non-teleportable items use a portal for a Coins fare based on their total weight and travel distance. Items with an absolute teleport restriction remain blocked.",
+            "Off keeps Valheim's normal item teleport restrictions. Pay lets ordinary non-teleportable items use a portal for a Coins fare based on their total weight and travel distance. Items with an absolute teleport restriction remain blocked unless another mod explicitly overrides the game's teleportability check.",
             order: 200,
             categoryOrder: 100);
         CoinsPerWeightKilometer = ConfigEntry(

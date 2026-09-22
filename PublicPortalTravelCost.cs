@@ -58,7 +58,7 @@ internal static class PublicPortalTravelCost
         out int cargoWeightUnits)
     {
         cargoWeightUnits = 0;
-        Inventory? inventory = player?.GetInventory();
+        Inventory? inventory = player.GetInventory();
         if (inventory == null)
         {
             return false;
@@ -79,9 +79,11 @@ internal static class PublicPortalTravelCost
 
             // Valheim 1.0 reserves tier 1000+ for restrictions which also
             // apply to all-items portals and the TeleportAll world modifier.
+            // Ask the game's final teleportability path before blocking so
+            // Harmony-based item-permission mods can explicitly waive it.
             if (item.m_shared.m_toolTier >= 1000)
             {
-                return false;
+                return player.IsTeleportable(sourceAllowsAllItems);
             }
 
             if (bypassOrdinaryRestrictions || item.m_shared.m_teleportable)
@@ -102,6 +104,12 @@ internal static class PublicPortalTravelCost
                 (double)MaximumCargoWeightUnits / CargoWeightScale)
             {
                 cargoWeightUnits = MaximumCargoWeightUnits;
+                if (player.IsTeleportable(sourceAllowsAllItems))
+                {
+                    cargoWeightUnits = 0;
+                    return true;
+                }
+
                 return IsEnabled;
             }
         }
@@ -109,7 +117,20 @@ internal static class PublicPortalTravelCost
         cargoWeightUnits = restrictedWeight <= 0d
             ? 0
             : (int)Math.Ceiling(restrictedWeight * CargoWeightScale);
-        return cargoWeightUnits == 0 || IsEnabled;
+        if (cargoWeightUnits == 0)
+        {
+            return true;
+        }
+
+        // A mod which makes this inventory teleportable owns that policy;
+        // such cargo is free because it is no longer restricted cargo.
+        if (player.IsTeleportable(sourceAllowsAllItems))
+        {
+            cargoWeightUnits = 0;
+            return true;
+        }
+
+        return IsEnabled;
     }
 
     internal static int CalculateCost(

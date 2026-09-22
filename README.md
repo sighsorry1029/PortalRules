@@ -95,7 +95,7 @@ Adjust the position and rotation for each location. Editing the YAML does not mo
 
 When `Enable Portal Map` is On, enter a handled non-Tagged portal to open the destination map. Select an accessible portal pin to travel.
 
-With `Portal Fare Mode` set to `Off`, a restricted source carrying a non-teleportable item shows Valheim's item restriction message without opening the map. In `Pay` mode, ordinary restricted cargo opens the map and shows its fare; absolutely restricted items remain blocked. Portals that allow every item show **All Items Teleportable** above their hover details.
+With `Portal Fare Mode` set to `Off`, a restricted source carrying a non-teleportable item shows Valheim's item restriction message without opening the map. In `Pay` mode, ordinary restricted cargo opens the map and shows its fare; absolutely restricted items remain blocked unless another mod explicitly overrides Valheim's final teleportability check. Portals that allow every item show **All Items Teleportable** above their hover details.
 
 The arrow beside **Favorite Portals** collapses the list. Its state is saved locally.
 
@@ -163,7 +163,7 @@ Overall limits are shared by every character on the authenticated Steam account.
 - Rows stay in add order from oldest to newest; re-adding one moves it to the bottom.
 - At the 10-favorite limit, a new favorite may replace the oldest saved portal that is no longer available.
 - Invite cooldowns and fares appear on pins or favorite rows.
-- `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show quota positions.
+- `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show quota positions. When the overall portal limit is unlimited, the own-portal label shows only `My portal n`.
 - Tagged Admin portal prefabs remain usable as connected portals by every eligible player, but their map pins are visible only to server administrators in debug mode.
 
 If `Enable Portal Map` is Off, PortalRules uses connected destinations for all modes while still applying server authorization.
@@ -193,7 +193,7 @@ fare = ceil(non-teleportable cargo weight
 
 In Pay mode, a restricted source portal keeps its whirling effect active for payable cargo and opens the destination map. Map pins and favorite rows show the calculated fare. Tagged portals keep direct connected travel and show the same fare in the connected hover badge. All-items portals and the `TeleportAll` world modifier remain free because they already allow the cargo.
 
-The server calculates the route and final fare from the client cargo-weight snapshot, and the client verifies that exact weight again before taking Coins and starting the teleport. Denied trips and teleports that fail to start do not consume Coins. Valheim 1.0's absolute item restrictions remain blocked in both modes.
+The server calculates the route and final fare from the client cargo-weight snapshot, and the client verifies that exact weight again before taking Coins and starting the teleport. Denied trips and teleports that fail to start do not consume Coins. Valheim 1.0's absolute item restrictions remain blocked in both modes unless another mod explicitly overrides the game's final teleportability check. Cargo allowed by such an override is free because PortalRules no longer treats it as restricted cargo.
 
 ## Server files
 

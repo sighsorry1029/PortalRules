@@ -86,7 +86,14 @@ public static class PortalRulesBehaviorChecks
         cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 99f, m_stack = 1,
             m_shared = new Shared { m_teleportable = true } });
         _fareEnabled = false;
-        Check(!TryGetCargoWeightUnits(cargoPlayer, false, out int cargoWeight) && cargoWeight == 12750,
+        cargoPlayer.Teleportable = true;
+        int teleportabilityCalls = cargoPlayer.Calls;
+        Check(TryGetCargoWeightUnits(cargoPlayer, false, out int cargoWeight) && cargoWeight == 0,
+            "External teleportability override makes ordinary restricted cargo free");
+        Check(cargoPlayer.Calls == teleportabilityCalls + 1 && !cargoPlayer.LastAllowAll,
+            "External teleportability check receives the source policy");
+        cargoPlayer.Teleportable = false;
+        Check(!TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight) && cargoWeight == 12750,
             "Off blocks ordinary restricted cargo and still reports its weight");
         _fareEnabled = true;
         Check(TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight) && cargoWeight == 12750,
@@ -98,6 +105,13 @@ public static class PortalRulesBehaviorChecks
             "TeleportAll bypasses ordinary cargo fare");
         cargoPlayer.Inventory.Items.Add(new ItemDrop.ItemData { Weight = 1f, m_stack = 1,
             m_shared = new Shared { m_teleportable = false, m_toolTier = 1000 } });
+        cargoPlayer.Teleportable = true;
+        teleportabilityCalls = cargoPlayer.Calls;
+        Check(TryGetCargoWeightUnits(cargoPlayer, true, out cargoWeight) && cargoWeight == 0,
+            "External teleportability override can waive an absolute restriction");
+        Check(cargoPlayer.Calls == teleportabilityCalls + 1 && cargoPlayer.LastAllowAll,
+            "Absolute restriction override receives the all-items source policy");
+        cargoPlayer.Teleportable = false;
         Check(!TryGetCargoWeightUnits(cargoPlayer, true, out cargoWeight),
             "Absolute restriction blocks all-items sources");
         Check(!TryGetCargoWeightUnits(cargoPlayer, false, out cargoWeight),

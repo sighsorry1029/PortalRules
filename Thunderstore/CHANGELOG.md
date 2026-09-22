@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.10
+
+- Respect Valheim's final modded item-teleportability result before PortalRules blocks travel or calculates a fare. Items explicitly allowed by another mod, including absolute-restriction items, can travel without a PortalRules Coin fare while the existing vanilla and fare rules remain unchanged otherwise.
+- Show unlimited own-portal map labels as `My portal n` instead of `My portal n/∞`; finite account limits retain the `n/limit` format.
+
 ## 1.0.9
 
 - Added the server-synchronized `Default Portal Mode` setting for newly placed ordinary player portals, with `Personal`, `Clan`, and `Public` choices. Clan safely falls back to Personal when membership or quota cannot be confirmed, while Public follows the existing expiration rule.
