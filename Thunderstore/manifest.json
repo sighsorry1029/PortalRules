@@ -1,9 +1,9 @@
 {
   "name": "PortalRules",
-  "version_number": "1.0.11",
+  "version_number": "1.1.0",
   "website_url": "https://discord.gg/jkcJCq2sK5",
   "description": "Adds secure portal travel with a map for choosing destinations, Personal, Public, Invite, Clan and Tagged access modes, portal limits, Admin portals, GlobalKey gates, favorites, cooldowns, and optional cargo-weight Coin fares.",
   "dependencies": [
-    "denikson-BepInExPack_Valheim-5.4.2350"
+    "denikson-BepInExPack_Valheim-5.4.2351"
   ]
 }

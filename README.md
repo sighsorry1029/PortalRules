@@ -251,5 +251,6 @@ Optional integrations:
 
 - Clan API v4 on the server for Clan access; without it, Clan selection and non-Builder access fail closed
 - A compatible YouAreNotWorthy installation for character GlobalKeys and its localized missing-key message when available
+- CurrencyPocket (1.0.15) or EndosCoinPurse (1.0.5) for paying fares from a coin wallet. Use one wallet mod at a time. Payment uses wallet Coins first, then inventory Coins; failed teleport starts refund the reserved fare.
 
 If YouAreNotWorthy is installed but its compatible API is unavailable, key-gated portals fail closed.

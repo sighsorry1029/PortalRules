@@ -13,16 +13,18 @@ namespace PortalRules;
 [BepInPlugin(ModGUID, ModName, ModVersion)]
 [BepInDependency(ClanSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(CurrencyPocketSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(EndosCoinPurseSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(YouAreNotWorthySoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInIncompatibility(TargetPortalIncompatibilityGuid)]
 public class PortalRulesPlugin : BaseUnityPlugin
 {
     internal const string ModName = "PortalRules";
-    internal const string ModVersion = "1.0.11";
+    internal const string ModVersion = "1.1.0";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
     internal const string ClanSoftDependencyGuid = "sighsorry.Clan";
     internal const string CurrencyPocketSoftDependencyGuid = "Azumatt.CurrencyPocket";
+    internal const string EndosCoinPurseSoftDependencyGuid = "EndosCoinPurse";
     internal const string YouAreNotWorthySoftDependencyGuid = "sighsorry.YouAreNotWorthy";
     internal const string TargetPortalIncompatibilityGuid = "org.bepinex.plugins.targetportal";
     private readonly Harmony _harmony = new(ModGUID);

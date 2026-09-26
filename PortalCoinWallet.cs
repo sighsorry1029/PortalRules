@@ -13,24 +13,44 @@ internal readonly struct PortalCoinPaymentReceipt
     internal readonly Inventory? Inventory;
     internal readonly int InventoryCoins;
     internal readonly int PocketCoins;
+    internal readonly PortalCoinWallet.EndosPayment? Endos;
 
     internal PortalCoinPaymentReceipt(
         Player player,
         Inventory inventory,
         int inventoryCoins,
-        int pocketCoins)
+        int pocketCoins,
+        PortalCoinWallet.EndosPayment? endos = null)
     {
         Player = player;
         Inventory = inventory;
         InventoryCoins = Math.Max(0, inventoryCoins);
         PocketCoins = Math.Max(0, pocketCoins);
+        Endos = endos;
     }
 
-    internal int TotalCoins => InventoryCoins + PocketCoins;
+    internal int TotalCoins => InventoryCoins + PocketCoins + (Endos?.PaidPurseCoins ?? 0);
 }
 
 internal static class PortalCoinWallet
 {
+    // Mutable refund progress is shared by receipt copies: a retried rollback must
+    // not restore a successfully refunded source twice.
+    internal sealed class EndosPayment
+    {
+        internal readonly Inventory Purse;
+        internal readonly ItemDrop.ItemData? CoinTemplate;
+        internal readonly List<(ItemDrop.ItemData Original, ItemDrop.ItemData Snapshot)> PhysicalRefunds = new();
+        internal int PaidPurseCoins;
+        internal int PurseRefund;
+
+        internal EndosPayment(Inventory purse, ItemDrop.ItemData? coinTemplate)
+        {
+            Purse = purse;
+            CoinTemplate = coinTemplate?.Clone();
+        }
+    }
+
     private enum CurrencyPocketState
     {
         Absent = 0,
@@ -40,6 +60,13 @@ internal static class PortalCoinWallet
 
     private const string CurrencyPocketCoinDataKey = "CoinPocket_CoinCount";
     private const string CoinPrefabName = "Coins";
+    private const string EndosCoinDataKey = "buidel_items_hud_count";
+    private const string EndosTypeName = "ValheimMuntBuidelHUD.EndosCoinPurseMod";
+    private static Type? CachedEndosType;
+    private static FieldInfo? CachedEndosInventory;
+    private static MethodInfo? CachedEndosUpdateUi;
+    private static bool EndosFailureLogged;
+    private static bool EndosUiFailureLogged;
     private const string CurrencyPocketTypeName =
         "CurrencyPocket.CurrencyPocket";
     private const string CurrencyPocketUpdateUiMethodName =
@@ -63,17 +90,26 @@ internal static class PortalCoinWallet
             return 0;
         }
 
-        int inventoryCoins = Math.Max(
-            0,
-            inventory.CountItems(coinName, -1, false));
+        Player? player = Player.m_localPlayer;
+        if (player == null || !TryGetEndosPurse(player, coinName,
+                out Inventory? purse, out _, out int endosCoins))
+        {
+            return 0;
+        }
+
+        // CountItems can already include another mod's virtual wallet.
+        long inventoryCoins = CountPhysicalCoins(inventory, coinName);
+        if (purse != null)
+        {
+            return (int)Math.Min(int.MaxValue, inventoryCoins + endosCoins);
+        }
         CurrencyPocketState currencyPocketState =
             GetCurrencyPocketState(out _);
         if (currencyPocketState == CurrencyPocketState.Absent)
         {
-            return inventoryCoins;
+            return (int)Math.Min(int.MaxValue, inventoryCoins);
         }
 
-        Player? player = Player.m_localPlayer;
         if (currencyPocketState != CurrencyPocketState.Present ||
             player == null ||
             !TryGetCurrencyPocketBalance(player, out int pocketCoins))
@@ -81,7 +117,7 @@ internal static class PortalCoinWallet
             return 0;
         }
 
-        long total = (long)inventoryCoins + pocketCoins;
+        long total = inventoryCoins + pocketCoins;
         return total >= int.MaxValue ? int.MaxValue : (int)total;
     }
 
@@ -107,6 +143,18 @@ internal static class PortalCoinWallet
                 out string coinName))
         {
             return false;
+        }
+
+        if (!TryGetEndosPurse(player, coinName,
+                out Inventory? purse, out ItemDrop.ItemData? purseCoin,
+                out int purseCoins))
+        {
+            return false;
+        }
+        if (purse != null)
+        {
+            return TryConsumeEndosPayment(player, inventory, coinName,
+                purse, purseCoin, purseCoins, amount, out receipt);
         }
 
         return GetCurrencyPocketState(out _) switch
@@ -139,9 +187,15 @@ internal static class PortalCoinWallet
         Inventory? inventory = receipt.Inventory;
         if (player == null ||
             inventory == null ||
-            !ReferenceEquals(player, Player.m_localPlayer))
+            !ReferenceEquals(player, Player.m_localPlayer) ||
+            !ReferenceEquals(inventory, player.GetInventory()))
         {
             return false;
+        }
+
+        if (receipt.Endos != null)
+        {
+            return TryRestoreEndosPayment(player, inventory, receipt.Endos);
         }
 
         return receipt.PocketCoins > 0 ||
@@ -256,7 +310,8 @@ internal static class PortalCoinWallet
         Inventory inventory,
         string coinName,
         int amount,
-        out int removed)
+        out int removed,
+        List<(ItemDrop.ItemData Original, ItemDrop.ItemData Snapshot)>? refunds = null)
     {
         removed = 0;
         if (amount <= 0)
@@ -264,9 +319,7 @@ internal static class PortalCoinWallet
             return true;
         }
 
-        int before = Math.Max(
-            0,
-            inventory.CountItems(coinName, -1, false));
+        long before = CountPhysicalCoins(inventory, coinName);
         bool completed = true;
         try
         {
@@ -285,8 +338,23 @@ internal static class PortalCoinWallet
                 }
 
                 int take = Math.Min(item.m_stack, remaining);
-                inventory.RemoveItem(item, take);
-                remaining -= take;
+                ItemDrop.ItemData? snapshot = refunds != null ? item.Clone() : null;
+                long stackBefore = CountPhysicalCoins(inventory, coinName);
+                try
+                {
+                    inventory.RemoveItem(item, take);
+                }
+                finally
+                {
+                    int actual = (int)Math.Max(0, Math.Min(take,
+                        stackBefore - CountPhysicalCoins(inventory, coinName)));
+                    if (snapshot != null && actual > 0)
+                    {
+                        snapshot.m_stack = actual;
+                        refunds!.Add((item, snapshot));
+                    }
+                    remaining -= actual;
+                }
             }
 
             completed = remaining == 0;
@@ -298,11 +366,305 @@ internal static class PortalCoinWallet
                 $"Failed while removing physical Coins for a portal fare: {ex.GetBaseException().Message}");
         }
 
-        int after = Math.Max(
-            0,
-            inventory.CountItems(coinName, -1, false));
-        removed = Math.Max(0, before - after);
+        long after = CountPhysicalCoins(inventory, coinName);
+        removed = (int)Math.Max(0, Math.Min(int.MaxValue, before - after));
         return completed && removed == amount;
+    }
+
+    private static long CountPhysicalCoins(Inventory inventory, string coinName)
+    {
+        long count = 0;
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        {
+            if (item?.m_shared?.m_name == coinName && item.m_stack > 0)
+            {
+                count += item.m_stack;
+            }
+        }
+        return count;
+    }
+
+    private static bool TryGetEndosPurse(
+        Player player, string coinName, out Inventory? purse,
+        out ItemDrop.ItemData? coin, out int balance)
+    {
+        purse = null;
+        coin = null;
+        balance = 0;
+        try
+        {
+            if (!Chainloader.PluginInfos.TryGetValue(
+                    PortalRulesPlugin.EndosCoinPurseSoftDependencyGuid, out var plugin))
+            {
+                return true;
+            }
+            Type? type = plugin.Instance != null
+                ? plugin.Instance.GetType().Assembly.GetType(EndosTypeName, false)
+                : null;
+            if (type == null)
+            {
+                throw new InvalidOperationException("plugin instance/type is unavailable");
+            }
+            if (CachedEndosType != type)
+            {
+                CachedEndosType = type;
+                CachedEndosInventory = type.GetField("VirtueleBuidelInv",
+                    BindingFlags.Public | BindingFlags.Static);
+                CachedEndosUpdateUi = type.GetMethod("UpdateBuidelCount",
+                    BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+            }
+            purse = CachedEndosInventory?.GetValue(null) as Inventory;
+            if (purse == null || ReferenceEquals(purse, player.GetInventory()) ||
+                !ReferenceEquals(player, Player.m_localPlayer) ||
+                !TryReadEndosCoins(purse, coinName, out coin, out balance))
+            {
+                throw new InvalidOperationException("wallet inventory is unavailable or invalid");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogEndosFailureOnce(ex.GetBaseException().Message);
+            return false;
+        }
+    }
+
+    private static bool TryReadEndosCoins(
+        Inventory purse, string coinName, out ItemDrop.ItemData? coin, out int balance)
+    {
+        coin = null;
+        balance = 0;
+        foreach (ItemDrop.ItemData item in purse.GetAllItems())
+        {
+            // Endos persists and displays only the first Coins stack, not a sum.
+            if (coin != null || item?.m_shared?.m_name != coinName || item.m_stack < 0)
+            {
+                return false;
+            }
+            coin = item;
+            balance = item.m_stack;
+        }
+        return true;
+    }
+
+    private static bool IsSameEndosPurse(Player player, Inventory purse)
+    {
+        try
+        {
+            return ReferenceEquals(player, Player.m_localPlayer) &&
+                   Chainloader.PluginInfos.TryGetValue(
+                       PortalRulesPlugin.EndosCoinPurseSoftDependencyGuid, out var plugin) &&
+                   plugin.Instance != null &&
+                   ReferenceEquals(CachedEndosInventory?.GetValue(null), purse);
+        }
+        catch (Exception ex)
+        {
+            LogEndosFailureOnce(ex.GetBaseException().Message);
+            return false;
+        }
+    }
+
+    private static bool TryChangeEndosCoins(
+        Player player, Inventory purse, ItemDrop.ItemData? template,
+        string coinName, int delta, out int changed)
+    {
+        changed = 0;
+        if (!IsSameEndosPurse(player, purse) ||
+            !TryReadEndosCoins(purse, coinName, out ItemDrop.ItemData? coin, out int before) ||
+            (long)before + delta < 0 || (long)before + delta > int.MaxValue)
+        {
+            return false;
+        }
+        // The saved cache can lag behind a manual wallet withdrawal. It is not
+        // authoritative for spending, but crediting an empty wallet with a pending
+        // saved balance could be overwritten by Endos' delayed load coroutine.
+        if (delta > 0 && before == 0 &&
+            player.m_customData.TryGetValue(EndosCoinDataKey, out string stored) &&
+            (!int.TryParse(stored, out int savedCoins) || savedCoins != 0))
+        {
+            LogEndosFailureOnce("cannot credit an empty purse while its saved balance is unresolved");
+            return false;
+        }
+        bool mutationCompleted = true;
+        try
+        {
+            if (delta < 0 && coin != null)
+            {
+                purse.RemoveItem(coin, -delta);
+            }
+            else if (delta > 0 && coin != null)
+            {
+                coin.m_stack += delta;
+            }
+            else if (delta > 0 && template != null)
+            {
+                ItemDrop.ItemData restored = template.Clone();
+                restored.m_stack = delta;
+                // The prefab overload clamps oversized virtual purse balances.
+                purse.AddItem(restored);
+            }
+        }
+        catch (Exception ex)
+        {
+            mutationCompleted = false;
+            LogEndosFailureOnce(ex.GetBaseException().Message);
+        }
+        if (!TryReadEndosCoins(purse, coinName, out _, out int after))
+        {
+            return false;
+        }
+        changed = after - before;
+        // Even if an Inventory Changed subscriber throws after mutation, save the
+        // observed balance and let the caller roll back the observed debit.
+        bool saved = true;
+        try
+        {
+            player.m_customData[EndosCoinDataKey] = after.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex)
+        {
+            // Keep 'changed' observable to the caller even if persistence fails
+            // after an Inventory callback has already changed the live purse.
+            saved = false;
+            LogEndosFailureOnce(ex.GetBaseException().Message);
+        }
+        try
+        {
+            CachedEndosUpdateUi?.Invoke(null, null);
+        }
+        catch (Exception ex)
+        {
+            if (!EndosUiFailureLogged)
+            {
+                EndosUiFailureLogged = true;
+                PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                    $"Could not refresh EndosCoinPurse HUD; its balance is saved: {ex.GetBaseException().Message}");
+            }
+        }
+        return mutationCompleted && saved && changed == delta;
+    }
+
+    private static bool TryConsumeEndosPayment(
+        Player player, Inventory inventory, string coinName,
+        Inventory purse, ItemDrop.ItemData? purseCoin, int purseCoins,
+        int amount, out PortalCoinPaymentReceipt receipt)
+    {
+        receipt = default;
+        if (CountPhysicalCoins(inventory, coinName) + purseCoins < amount)
+        {
+            return false;
+        }
+        EndosPayment payment = new(purse, purseCoin);
+        int purseTake = Math.Min(purseCoins, amount);
+        int physicalTake = amount - purseTake;
+        bool committed = false;
+        try
+        {
+            if (purseTake > 0)
+            {
+                bool success = TryChangeEndosCoins(player, purse, payment.CoinTemplate,
+                    coinName, -purseTake, out int changed);
+                payment.PaidPurseCoins = payment.PurseRefund = Math.Max(0, -changed);
+                if (!success) return false;
+            }
+            if (!TryRemovePhysicalCoinsExact(inventory, coinName, physicalTake,
+                    out int removed, payment.PhysicalRefunds)) return false;
+
+            receipt = new PortalCoinPaymentReceipt(player, inventory, removed, 0, payment);
+            committed = true;
+            return true;
+        }
+        finally
+        {
+            if (!committed && !TryRestoreEndosPayment(player, inventory, payment))
+            {
+                PortalRulesPlugin.PortalRulesLogger.LogError(
+                    "Failed to restore an incomplete EndosCoinPurse portal fare reservation.");
+            }
+        }
+    }
+
+    private static bool TryRestoreEndosPayment(Player player, Inventory inventory, EndosPayment payment)
+    {
+        if (!IsSameEndosPurse(player, payment.Purse) ||
+            !ReferenceEquals(inventory, player.GetInventory())) return false;
+
+        bool success = true;
+        foreach (var physical in payment.PhysicalRefunds)
+        {
+            ItemDrop.ItemData snapshot = physical.Snapshot;
+            if (snapshot.m_stack <= 0) continue;
+            string name = snapshot.m_shared.m_name;
+            long before = CountPhysicalCoins(inventory, name);
+            try
+            {
+                Vector2i position = snapshot.m_gridPos;
+                ItemDrop.ItemData? occupying = inventory.GetItemAt(position.x, position.y);
+                if (position.x < 0 || position.y < 0 ||
+                    position.x >= inventory.GetWidth() || position.y >= inventory.GetHeight() ||
+                    (occupying != null && !ReferenceEquals(occupying, physical.Original)))
+                {
+                    position = new Vector2i(-1, -1);
+                    for (int y = 0; y < inventory.GetHeight() && position.x < 0; ++y)
+                    for (int x = 0; x < inventory.GetWidth(); ++x)
+                    {
+                        if (inventory.GetItemAt(x, y) == null)
+                        {
+                            position = new Vector2i(x, y);
+                            break;
+                        }
+                    }
+                }
+                if (position.x >= 0 && position.y >= 0)
+                {
+                    // MoveItemToThis is the public targeted insertion API. Unlike
+                    // AddItem(ItemData, Vector2i), it cannot merge into unrelated
+                    // stacks elsewhere and lose the original coin metadata.
+                    Inventory refundInventory = new(true);
+                    ItemDrop.ItemData refund = snapshot.Clone();
+                    if (refundInventory.AddItem(refund))
+                    {
+                        inventory.MoveItemToThis(refundInventory, refund,
+                            snapshot.m_stack, position.x, position.y);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                    $"Physical portal refund was interrupted: {ex.GetBaseException().Message}");
+            }
+            int restored = (int)Math.Max(0, Math.Min(snapshot.m_stack,
+                CountPhysicalCoins(inventory, name) - before));
+            snapshot.m_stack -= restored;
+            if (snapshot.m_stack > 0)
+            {
+                TryChangeEndosCoins(player, payment.Purse, snapshot, name,
+                    snapshot.m_stack, out int added);
+                snapshot.m_stack -= Math.Max(0, added);
+                if (added > 0)
+                {
+                    PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                        $"Restored {added} Coins to EndosCoinPurse because their inventory refund could not complete.");
+                }
+            }
+            success &= snapshot.m_stack == 0;
+        }
+        if (payment.PurseRefund > 0 && payment.CoinTemplate != null)
+        {
+            TryChangeEndosCoins(player, payment.Purse, payment.CoinTemplate,
+                payment.CoinTemplate.m_shared.m_name, payment.PurseRefund, out int added);
+            payment.PurseRefund -= Math.Max(0, added);
+        }
+        return success && payment.PurseRefund == 0;
+    }
+
+    private static void LogEndosFailureOnce(string reason)
+    {
+        if (EndosFailureLogged) return;
+        EndosFailureLogged = true;
+        PortalRulesPlugin.PortalRulesLogger.LogWarning(
+            $"EndosCoinPurse wallet is unavailable; paid portal travel will fail closed: {reason}");
     }
 
     private static bool TryRefundPhysicalCoins(

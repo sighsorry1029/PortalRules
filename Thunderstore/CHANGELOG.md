@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- Added optional EndosCoinPurse support for portal fares, using wallet Coins before inventory Coins without counting the wallet twice.
+- Added source-aware EndosCoinPurse refunds, including empty-wallet refunds above the normal stack limit, partial-payment rollback, immediate save/HUD updates, and duplicate-refund protection.
+- Retained CurrencyPocket 1.0.15 support and documented using one wallet mod at a time. Added focused wallet regression tests.
+- Updated the required BepInExPack Valheim dependency to 5.4.2351.
+
 ## 1.0.11
 
 - Fixed Crossplay portal placement being cancelled with `Crossplay identity verification failed` in mod combinations that wrap the PlayFab connection through ServerSync. Authenticated PlayFab identity and portal ownership checks remain enforced.
