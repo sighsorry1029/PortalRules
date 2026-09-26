@@ -1,0 +1,147 @@
+# PortalRules user guide
+
+Use PortalRules to choose portal destinations from the map, control who can use a portal, and optionally pay Coins to transport restricted cargo. The server decides which portals you can access and checks each trip again before travel.
+
+For installation and screenshots, see the [main README](https://github.com/sighsorry1029/PortalRules/blob/main/README.md). For server settings, account overrides, and world-generation setup, see the [server guide](https://github.com/sighsorry1029/PortalRules/blob/main/docs/server-guide.md).
+
+## Controls and first trip
+
+| Action | Default control |
+|---|---|
+| Set a portal tag | `Interact` |
+| Cycle the access mode | `LeftShift + Interact` |
+| Choose a destination | Left-click a portal pin on the destination map |
+| Show or hide accessible portal pins | `P` on the large map |
+| Add or remove a favorite | Right-click a portal pin |
+| Travel to a favorite | Left-click its row |
+| Remove a favorite | Right-click its row |
+| Focus the map on a favorite | Hover its row |
+| Set or clear an Admin portal's Required GlobalKey | Physical `LeftAlt/RightAlt + Interact`, with administrator debug access |
+
+With **Enable Portal Map** on (the default), enter a portal that PortalRules handles in a mode other than Tagged. The destination map opens; select an accessible destination pin or favorite row to travel. Tagged portals instead use their reciprocal tag connection.
+
+The access modifier, map-pin shortcut, map auto-close grace, and map zoom are local preferences. Gameplay settings are synchronized by the server and can be locked by its administrator. The destination map normally closes after you leave the source portal area, with a default grace period of `0.5` seconds; setting that grace period to `0` disables automatic closing.
+
+## Access modes and the Builder
+
+A portal keeps its original **Builder** attribution. Changing its mode or editing it does not transfer ownership to the person interacting with it. Personal access and Builder-only actions use the Builder's authenticated account, so they are not limited to the character name shown on the portal. Clan assignment uses the original Builder's primary Clan, not the editor's Clan.
+
+| Mode | Who can use it |
+|---|---|
+| `Personal` | The Builder's authenticated account. |
+| `Clan` | The Builder and Primary or Guest members of the bound Clan. The bound Clan comes from the Builder's primary membership. |
+| `Public` | Everyone, until the Public timer expires where applicable. |
+| `Invite` | Everyone, without a Public timer. Invite limits and travel cooldowns apply. |
+| `Tagged` | Direct travel through a reciprocal tag connection. Ordinary Tagged portals allow the Builder and Primary or Guest members of the Builder's bound Clan. |
+| `Admin` | The Builder, if present, and server-approved administrators. This mode is not selectable on ordinary portals. |
+
+Any Required GlobalKey is an additional condition: an allowed access mode does not bypass it.
+
+### Changing modes
+
+Ordinary portals cycle through `Personal → Clan → Public → Invite → Tagged → Personal`. Unavailable modes are skipped, such as Clan without a verified primary Clan or a mode whose entry limit has been reached.
+
+The following players may cycle an ordinary portal's modes:
+
+- Its Builder.
+- Primary or Guest members of the Builder's current primary Clan.
+- A server administrator in debug mode.
+
+Entering or leaving Invite is always Builder-only, including for administrators. A Guest can help change a Clan member's portal, but Guest-only membership does not let that Guest assign their own portal to the guest Clan: assignment still needs the Builder's primary Clan. If the Builder has no resolvable primary Clan, only the Builder or an administrator in debug mode may change modes.
+
+Clan access requires the server's compatible Clan API integration, version 4 or later. If it is missing or cannot verify membership, Clan selection and non-Builder Clan access are denied; ordinary Tagged portals remain Builder-only without verified Clan access.
+
+Admin portal pieces start in Public and cycle through `Admin → Public → Tagged → Admin`. Existing ordinary portals saved in Admin mode keep it until cycled, then change to Public.
+
+### New portals and Public expiry
+
+The server's **Default Portal Mode** selects `Personal` (the default), `Clan`, or `Public` for new ordinary player portals.
+
+- Clan falls back to Personal if the Builder's primary Clan cannot be verified, or the Clan portal limit is reached or unavailable.
+- Public returns to Personal after **Public Access Duration Seconds**, which defaults to `900` seconds (15 minutes). A duration of `0` disables automatic reversion.
+- Changing the default affects future placements only, including during a running session. It does not reset existing portals when the world reloads.
+- Admin portals and creatorless system portals keep their own rules. Portals generated by another mod with a verified player creator follow player-attribution rules.
+
+Public expiry uses an absolute UTC deadline. Server downtime and time spent away from the portal still count. Admin portal pieces and Builderless portals are excluded from this timer.
+
+## Limits, Invite cooldowns, and Crossplay
+
+These are the defaults; your server may use different values.
+
+| Rule | Default |
+|---|---|
+| Overall account portal limit | Off; `10` counted portals when enabled |
+| Invite portals per authenticated account | `0` (disabled) |
+| Invite departure cooldown | `1` hour |
+| Invite arrival cooldown | `1` hour |
+| Clan portals per Clan | `5` |
+
+Invite is disabled in new configurations by default. Existing saved settings and account overrides are preserved when updating. A server administrator can enable Invite by raising its effective limit.
+
+Invite departure and arrival cooldowns are separate, per account and per Invite portal. Leaving through an Invite portal uses its departure cooldown; arriving at one uses its arrival cooldown. Switching characters on the same authenticated account does not give a new Invite allowance or bypass its cooldowns.
+
+If the effective Invite limit is set to `0`, eligible Invite portals return to their Builder's Personal mode. Raising the limit later does not automatically restore Invite.
+
+The optional overall account limit is shared across characters on the same Steam account. By default it counts `portal_wood`, `portal`, and `portal_stone`. Admin portals and ordinary portals with neither a valid Builder nor a creator ID are excluded. Lowering the limit does not destroy existing portals. Turning off this limit bypasses its account overrides too, but does not disable Invite or Clan limits.
+
+In Crossplay/PlayFab sessions, the overall account portal limit is automatically inactive, even if its saved setting is on. That saved setting is preserved for Steamworks sessions. Personal ownership, Builder editing, Invite limits, cooldowns, and travel authorization use the authenticated PlayFab entity identity instead of Steam identity. Steam and PlayFab ownership stay separate: switching connection backends does not transfer portals or merge accounts. Crossplay uses the global Invite limit, not Steam account overrides.
+
+The optional Clan integration still needs a verified Steam identity for remote membership lookup. Crossplay identity support does not itself grant Clan access or remote administrator privileges. If placement identity verification fails, read the accompanying Crossplay guidance in the message.
+
+## Portal map, favorites, and connections
+
+Portal pins show access modes, tags, travel restrictions, fares, and ownership or quota indicators. Invite cooldowns also appear on pins or favorite rows. A portal visible on the map can still be temporarily unavailable for travel because of cargo, payment, or cooldown requirements.
+
+The quota labels `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show each portal's position within its quota. When the overall account limit is unlimited, the own-portal label is simply `My portal n`.
+
+Favorites make repeated trips easier:
+
+- Favorites survive world reloads. Dismantling and rebuilding a portal creates a new identity, so add the rebuilt portal again.
+- Rows stay in the order you added them, oldest first. Removing and re-adding one moves it to the bottom.
+- You can save up to `10` favorites. At the limit, adding one may replace the oldest saved portal that is no longer available; otherwise remove a favorite first.
+- The arrow beside **Favorite Portals** collapses or expands the list. This preference is saved locally.
+
+The **CONNECTED** hover label appears only for Tagged portals with a reciprocal connection. Other access modes omit the connection-status label. Tagged portals keep direct connected travel even when the destination map is enabled.
+
+Tagged Admin portals use a separate public connection pool. Eligible players can travel through them, but their map pins are visible only to server administrators in debug mode. Required GlobalKeys still apply.
+
+If **Enable Portal Map** is off, all modes use connected destinations while PortalRules continues to check travel permission on the server.
+
+## Restricted items and Coins fares
+
+The source portal determines whether ordinary restricted cargo needs a fare. Portals that allow every ordinary item display **All Items Teleportable** above their hover details.
+
+| Portal Fare Mode | What happens with restricted cargo |
+|---|---|
+| `Off` (default) | Normal item restrictions apply. A restricted source rejects non-teleportable cargo before opening the destination map. |
+| `Pay` | Ordinary non-teleportable cargo can travel from a restricted source for a Coins fare. Its destination map opens and shows the cost. |
+
+In Pay mode, the cost is rounded up to a whole Coin:
+
+```text
+fare = ceil(ordinary non-teleportable cargo weight
+          × horizontal (XZ) distance in kilometers
+          × Coins Per Weight Kilometer)
+```
+
+The default rate is `0.1` Coins per weight-kilometer. Only restricted cargo contributes to the weight, not the full inventory. Pins and favorite rows show the fare. A restricted source keeps its whirling effect active for payable cargo; Tagged portals show the same fare in their connected hover badge.
+
+All-items portals and the `TeleportAll` world modifier remain free for cargo they already allow. Valheim's absolute item restrictions still apply in both fare modes, including at all-items portals, unless another mod explicitly overrides the game's final teleportability check. Cargo allowed by such an override is free because PortalRules no longer treats it as restricted.
+
+The server calculates the route and final fare from the client's cargo-weight snapshot. Before taking Coins and starting travel, the client checks that the exact cargo weight still matches. A denied trip does not consume Coins; a teleport that fails to start refunds its reserved fare.
+
+### Coin wallets
+
+Coins in your inventory work without a wallet mod. Optional wallet support covers **CurrencyPocket 1.0.15** or **EndosCoinPurse 1.0.5**. Use only one wallet mod at a time.
+
+When a supported wallet is present, payment uses wallet Coins first, then inventory Coins. Failed teleport starts refund the reserved fare. If the installed wallet or its balance cannot be read reliably, paid travel is blocked instead of guessing the available balance.
+
+## Admin portals and progression keys
+
+Admin Wood and Admin Stone appear under **Hammer → Misc** only for server administrators in debug mode. They have no player creator or Builder, do not count toward portal quotas, and support only Admin, Public, and Tagged modes.
+
+Their placed frames are invisible and non-solid, with a whirling marker while a player is nearby. Placing, editing, or dismantling one requires administrator debug access; dismantling returns no resources.
+
+A Required GlobalKey gates a portal behind progression in addition to its access mode. An administrator can set or clear it with physical `LeftAlt/RightAlt + Interact`. Without YouAreNotWorthy, requirements use shared world GlobalKeys. With a compatible YouAreNotWorthy API, ordinary progression keys can be checked per character, with its localized missing-key message when available. If YouAreNotWorthy is installed but its compatible API is unavailable, key-gated portals remain blocked.
+
+For configuration files, account exceptions, biome key defaults, and location or blueprint setup, continue to the [server guide](https://github.com/sighsorry1029/PortalRules/blob/main/docs/server-guide.md). The [README showcase](https://github.com/sighsorry1029/PortalRules/blob/main/README.md#showcase) includes images, animations, and the Expand World Data location example.

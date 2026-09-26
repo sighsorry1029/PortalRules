@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- Changed the default Invite portal limit to 0 for new configurations. Existing saved settings and per-account overrides are preserved.
+- Reworked the README showcase with resized static images, full-size GIFs, and separate player and server guides.
+
 ## 1.1.0
 
 - Added optional EndosCoinPurse support for portal fares, using wallet Coins before inventory Coins without counting the wallet twice.

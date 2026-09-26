@@ -167,7 +167,7 @@ internal static class PublicPortalConfig
         MaxInvitePortalsPerAccount = ConfigEntry(
             "3 - Access Modes",
             "Max Invite Portals Per Account",
-            1,
+            0,
             new ConfigDescription(
                 "Maximum player-built portals one authenticated account (Steam on Steamworks, PlayFab entity on Crossplay) may keep in Invite mode. -1 is unlimited. An effective value of 0 disables Invite mode and returns existing eligible Invite portals to their immutable Builder's Personal access.",
                 new AcceptableValueRange<int>(-1, 10000)),
