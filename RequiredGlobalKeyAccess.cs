@@ -22,7 +22,8 @@ internal enum RequiredGlobalKeyQueryResult : byte
 /// </summary>
 internal static class RequiredGlobalKeyAccess
 {
-    private const int SupportedApiVersion = 1;
+    private const int MinimumSupportedApiVersion = 1;
+    private const int MaximumSupportedApiVersion = 2;
     private const string ApiTypeName =
         "YouAreNotWorthy.YouAreNotWorthyApi";
 
@@ -95,8 +96,10 @@ internal static class RequiredGlobalKeyAccess
                 binder: null,
                 types: new[] { typeof(string) },
                 modifiers: null);
+            // API v2 adds item-use queries while preserving the v1 key-query contract.
             _apiAvailable =
-                apiVersion == SupportedApiVersion &&
+                apiVersion >= MinimumSupportedApiVersion &&
+                apiVersion <= MaximumSupportedApiVersion &&
                 _queryLocal != null &&
                 _queryPeer != null;
 
@@ -116,7 +119,7 @@ internal static class RequiredGlobalKeyAccess
             {
                 PortalRulesPlugin.PortalRulesLogger.LogError(
                     $"YouAreNotWorthy is installed but its Required GlobalKey API is unavailable " +
-                    $"or incompatible (found v{apiVersion}, expected v{SupportedApiVersion}). " +
+                    $"or incompatible (found v{apiVersion}, supported v{MinimumSupportedApiVersion}-v{MaximumSupportedApiVersion}). " +
                     "Key-gated portals will fail closed.");
             }
         }

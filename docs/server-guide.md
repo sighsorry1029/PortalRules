@@ -160,6 +160,8 @@ A Required GlobalKey is an additional travel requirement, not a replacement for 
 
 Without YouAreNotWorthy, PortalRules checks shared world GlobalKeys. With its compatible Required GlobalKey API, ordinary progression keys can be checked per character, and its localized missing-key message is used when available.
 
+PortalRules supports YNW API v1 and v2, including YouAreNotWorthy 1.0.8. Existing personal keys continue to satisfy matching portal requirements without defeating bosses again or migrating saved data. Update PortalRules on the host/server and clients, then restart and reconnect so character keys can synchronize.
+
 If YouAreNotWorthy is installed but its API is incompatible or unavailable, key-gated travel is denied; PortalRules does not silently fall back to shared world progression. Invalid stored requirements likewise deny access.
 
 ## Coins fares

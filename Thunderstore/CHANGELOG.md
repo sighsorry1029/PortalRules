@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+- Fixed Required GlobalKey portal access and requirement editing with YouAreNotWorthy 1.0.8 (API v2), while retaining API v1 support.
+- Existing personal progression keys are recognized without defeating bosses again or migrating saved data. Install the update on the host/server and clients.
+- Added regression checks for both API versions, existing local and remote personal keys, and denied access when the API or key data is unavailable. Unsupported API versions still block key-gated travel.
+
 ## 1.1.1
 
 - Changed the default Invite portal limit to 0 for new configurations. Existing saved settings and per-account overrides are preserved.
