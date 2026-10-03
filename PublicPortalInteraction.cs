@@ -660,7 +660,7 @@ internal static partial class PublicPortalInteraction
                 connectedLabel,
                 unconnectedLabel,
                 connectionStatus);
-            if (PublicPortalAccess.CanEditPortal(zdo))
+            if (PublicPortalAccess.CanRequestAccessModeChange(zdo))
             {
                 string useKey = Localization.instance != null ? Localization.instance.Localize("$KEY_Use") : "$KEY_Use";
                 __result += "\n" + PortalRulesLocalization.Translate(
@@ -920,7 +920,7 @@ internal static partial class PublicPortalInteraction
                 return true;
             }
 
-            if (!PublicPortalAccess.CanEditPortal(zdo))
+            if (!PublicPortalAccess.CanRequestAccessModeChange(zdo))
             {
                 Player.m_localPlayer?.Message(
                     MessageHud.MessageType.Center,

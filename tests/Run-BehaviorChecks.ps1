@@ -81,3 +81,14 @@ $defaultModeFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'DefaultPo
 Add-Type -TypeDefinition ($defaultModeFixture.Replace('/* ENUMS */', ($modeEnums -join "`n")).
     Replace('/* PRODUCTION_METHODS */', $defaultModeMethods))
 [PortalRulesDefaultModeChecks]::Run()
+
+$modeChangeMethods = @(
+    (Read-Method 'PublicPortalInteraction.cs' 'TryApplyAccessModeChange'),
+    (Read-Method 'PublicPortalInteraction.cs' 'NextAccessModeCandidate'),
+    (Read-Method 'PublicPortalInteraction.cs' 'TryResolveNextAccessMode')
+) -join "`n"
+$modeChangeFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'PortalModeChangeChecks.cs'))
+Add-Type -TypeDefinition ($modeChangeFixture.Replace('/* ENUMS */', ($modeEnums -join "`n")).
+    Replace('/* REQUEST_METHOD */', (Read-Method 'PublicPortalAccess.cs' 'CanRequestAccessModeChange')).
+    Replace('/* SERVER_METHODS */', $modeChangeMethods))
+[PortalRulesModeChangeChecks]::Run()

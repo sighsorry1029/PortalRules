@@ -86,7 +86,7 @@ internal static class PublicPortalAccess
         };
     }
 
-    public static bool CanEditPortal(ZDO zdo)
+    public static bool CanRequestAccessModeChange(ZDO zdo)
     {
         if (zdo == null)
         {
@@ -119,6 +119,14 @@ internal static class PublicPortalAccess
             PublicPortalAccessMode.Invite)
         {
             return false;
+        }
+
+        if (ZNet.instance != null && !ZNet.instance.IsServer())
+        {
+            // Clan.ResolveMemberships is server-only, so an unavailable client
+            // lookup cannot decide edit permission. This gate only enables the
+            // hint/request; TryApplyAccessModeChange rechecks permission on the server.
+            return true;
         }
 
         return PortalRulesPlugin.HasAdminDebugAccess ||
