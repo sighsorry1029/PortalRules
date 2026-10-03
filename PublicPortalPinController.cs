@@ -11,7 +11,7 @@ namespace PortalRules;
 
 internal sealed class PublicPortalPinController
 {
-    private const float PortalClickRadius = 96f;
+    private const float PortalClickRadius = 128f;
     private const float TravelBadgeRefreshIntervalSeconds = 0.2f;
     private const float PinDecorationRefreshIntervalSeconds = 0.2f;
     private static readonly Color UnaffordableColor =
@@ -337,11 +337,11 @@ internal sealed class PublicPortalPinController
         Text favoriteStar = CreateDecorationText(
             root.transform,
             "FavoriteStar",
-            fontSize: 14,
+            fontSize: 16,
             FontStyle.Bold,
             FavoriteStarColor,
             Vector2.zero,
-            new Vector2(20f, 20f));
+            new Vector2(23f, 23f));
         favoriteStar.text = "★";
         Text cooldownCross = CreateDecorationText(
             root.transform,

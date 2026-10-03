@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.5
+
+- Increased the portal-map click radius by one third, making both destination selection and favorite toggling easier while still choosing the nearest portal.
+- Enlarged favorite stars by about 15% and increased their text area while keeping them centered on portal pins.
+- Update the host/server and clients together.
+
 ## 1.1.4
 
 - Updated the Thunderstore package icon to the new portal artwork.
