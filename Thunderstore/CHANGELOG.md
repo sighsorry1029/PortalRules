@@ -1,7 +1,8 @@
 # Changelog
 
-## 1.1.3
+## 1.1.4
 
+- Updated the Thunderstore package icon to the new portal artwork.
 - Fixed remote clients blocking Shift+E mode-change requests for portals built by another clan member. Clan permissions are now checked by the server instead of an unavailable client-side Clan lookup. Update the host/server and clients together.
 - Kept server authorization, Invite restrictions, and Admin portal rules unchanged. Personal ownership and Clan selection continue to use the original builder.
 - Added regression checks for remote requests, server rejection of unauthorized changes, and builder-based mode cycling.
