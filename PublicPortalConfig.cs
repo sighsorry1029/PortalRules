@@ -40,6 +40,7 @@ internal static class PublicPortalConfig
     private static bool _settingHandlersRegistered;
 
     public static ConfigEntry<PortalRulesPlugin.Toggle> EnablePortalMap = null!;
+    public static ConfigEntry<PortalRulesPlugin.Toggle> EnablePortalProtection = null!;
     public static ConfigEntry<KeyboardShortcut> ToggleAccessiblePortalsKey = null!;
     public static ConfigEntry<float> AutoCloseGraceSeconds = null!;
     public static ConfigEntry<int> PortalMapWheelZoomMultiplier = null!;
@@ -88,6 +89,21 @@ internal static class PublicPortalConfig
             order: 200,
             categoryOrder: 500);
         _ = ConfigSync.AddLockingConfigEntry(serverConfigLocked);
+
+        EnablePortalProtection = ConfigEntry(
+            "1 - General",
+            "Enable Portal Protection",
+            PortalRulesPlugin.Toggle.Off,
+            "Protect ordinary player-built portals from player and tamed-creature attacks. " +
+            "Only the Builder's account, members/guests of the Builder's primary Clan, or an admin using debug mode may dismantle them. " +
+            "Hostile creature damage is allowed while a living Builder or trusted Clan player is within 40 metres, with a 10-second departure grace and up to 3 seconds of client caching. " +
+            "Support-loss collapse is allowed only when a trusted player is currently nearby (no departure grace; short polling/cache delay still applies). " +
+            "Environmental wear and actual support values remain unchanged. Admin and creatorless system portals keep their existing rules. " +
+            "Inside an active STUWard, dismantling and damage follow STUWard rules and support-loss collapse is normal; PortalRules protection resumes outside active coverage. Requires STUWard's coverage API. " +
+            "Requires PortalRules on the server and clients; Clan trust depends on the existing Clan integration.",
+            synchronizedSetting: true,
+            order: 100,
+            categoryOrder: 500);
 
         EnablePortalMap = ConfigEntry(
             "2 - Portal Map",
@@ -501,6 +517,7 @@ internal static class PublicPortalConfig
 
         FavoritePortalListCollapsed.SettingChanged -=
             OnFavoritePortalListCollapsedChanged;
+        EnablePortalProtection.SettingChanged -= OnPortalProtectionChanged;
         PublicAccessDurationSeconds.SettingChanged -=
             OnPublicAccessDurationChanged;
         InviteDepartureCooldownHours.SettingChanged -=
@@ -527,6 +544,7 @@ internal static class PublicPortalConfig
         {
             FavoritePortalListCollapsed.SettingChanged +=
                 OnFavoritePortalListCollapsedChanged;
+            EnablePortalProtection.SettingChanged += OnPortalProtectionChanged;
             PublicAccessDurationSeconds.SettingChanged +=
                 OnPublicAccessDurationChanged;
             InviteDepartureCooldownHours.SettingChanged +=
@@ -556,6 +574,11 @@ internal static class PublicPortalConfig
         EventArgs args)
     {
         PublicPortalMapController.Instance.RefreshFavoritePanelFromPreference();
+    }
+
+    private static void OnPortalProtectionChanged(object sender, EventArgs args)
+    {
+        PublicPortalProtection.InvalidatePresence();
     }
 
     private static void OnPublicAccessDurationChanged(

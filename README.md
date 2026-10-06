@@ -86,6 +86,8 @@ Adjust positions and rotations to suit each location. Editing the YAML alone doe
 
 Install PortalRules on the server and clients, then enter an accessible non-Tagged portal and select a destination on the map. Tagged portals use their connected destination directly.
 
+Servers can optionally enable [portal protection](https://github.com/sighsorry1029/PortalRules/blob/main/docs/server-guide.md#optional-portal-protection): trusted players can dismantle portals, player attacks are blocked, and hostile creatures cannot damage unattended portals. Unsupported portals are protected from collapse while unattended and can collapse when a trusted player approaches. This setting is off by default.
+
 These are the default controls; **Interact** is normally **E**.
 
 | To… | Do this |

@@ -26,6 +26,7 @@ The main file is `BepInEx/config/sighsorry.PortalRules.cfg`. It is generated on 
 | Setting | Default | Effect |
 |---|---|---|
 | `Lock Configuration` | `On` | Restricts configuration changes to server administrators. |
+| `Enable Portal Protection` | `Off` | Restricts player-portal dismantling and blocks player/tamed attacks; protects unattended portals from hostile creature attacks and unsupported collapse. Environmental wear remains normal. |
 | `Enable Portal Map` | `On` | Opens destination selection for handled non-Tagged portals. `Off` uses connected destinations while retaining server authorization. |
 | `Default Portal Mode` | `Personal` | Initial mode for newly placed ordinary player portals: `Personal`, `Clan`, or `Public`. |
 | `Public Access Duration Seconds` | `900` | Returns eligible Public portals to Personal after 15 minutes. `0` disables expiry. |
@@ -42,6 +43,24 @@ The main file is `BepInEx/config/sighsorry.PortalRules.cfg`. It is generated on 
 Limits accept `-1..10000`. Public duration accepts `0..604800` seconds, and each Invite cooldown accepts `0..8760` hours.
 
 Invite is disabled by default for new configurations. Updating does not overwrite existing saved settings or account overrides; set `Max Invite Portals Per Account` to `0` yourself if you want to disable it on an existing server, taking any Invite overrides into account.
+
+### Optional portal protection
+
+Set **General → Enable Portal Protection** to `On` on the server to protect ordinary player-built portals. The setting is synchronized and can be changed live. Keep the same PortalRules build on the server and all clients. Admin portals and creatorless system portals retain their existing rules.
+
+- Player and tamed-creature attacks are blocked, including attacks by trusted players; use the Hammer to dismantle a portal.
+- Dismantling requires the original Builder's account, a player whose primary or Guest Clan matches the Builder's primary Clan, or an administrator using debug mode. Public/Invite travel access does not grant dismantling rights. Normal Hammer requirements and ward checks still apply.
+- Hostile creatures can damage the portal while a living Builder or trusted Clan player is within **40 metres**, and for **10 seconds after the last observed presence**, plus up to **3 seconds of client caching**. Admin debug permission alone does not count as attendance. The server checks attendance on demand; an object owner awaiting a valid server reply blocks attacks, so the first attack may be blocked even while a trusted player is nearby.
+- **Support-loss collapse is allowed only while a living trusted player is nearby.** There is no 10-second departure grace for collapse, although the one-second server sampling and short client cache still introduce a delay. The portal's real support values and support passed to other pieces are unchanged; weather, fire, biome and other environmental wear remain normal.
+- An unsupported destination may collapse as a trusted traveler arrives. A teleport that has already started keeps its saved destination coordinates; the portal's survival, a safe landing surface and a return route are not guaranteed. Teleport authorization and fares are unchanged.
+
+**Active STUWard areas take precedence.** With STUWard's coverage API available, a portal inside an enabled ward follows STUWard's dismantling permissions and damage settings. PortalRules does not add its own Builder/Clan restriction there, and unsupported collapse works normally. This also means STUWard's hostile-creature protection setting applies, including `Off`. Coverage is checked at the portal's position; foundations outside the ward are not included. Disabling, removing or shrinking a ward restores PortalRules protection when the local ward state updates. An in-flight dismantling request may need a retry if coverage changes before the owner receives it. Portal modes, travel permissions, fares and Invite cooldowns are unaffected.
+
+Install STUWard 1.3.18 or later and PortalRules 1.1.6 or later on the server and clients for this integration. STUWard remains optional: if it is absent, not ready, or lacks the coverage API, PortalRules keeps its own protection. Coverage uses STUWard's existing index of locally loaded wards; PortalRules does not cache ward membership or scan all wards every frame. Outside active wards, trust follows PortalRules' existing Clan integration, including Guest membership; it does not copy STUWard's individual permission list. Builder-account protection works with Steamworks and Crossplay, while Clan trust retains the existing integration's platform/API restrictions. The protection is applied by modded clients as well as the server, and is not a guarantee against modified clients sending arbitrary world-state changes.
+
+Removal is authorized by the server and executed once by the current object owner using the game's resource-drop path. An owner change, unloaded object, expired approval, or another protection mod may require a retry; no resources are manually reimbursed. Installation rejection and administrator cleanup keep their existing no-drop behavior.
+
+Destroying an Invite portal deletes that portal's cooldown history. A journey already in flight does not recreate it when its commit arrives. If the other endpoint is still an Invite portal, its cooldown is recorded normally; temporary reservation state is cleared on commit, cancellation or expiry.
 
 ### Client-local settings
 

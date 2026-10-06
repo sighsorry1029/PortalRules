@@ -153,6 +153,7 @@
         <Compile Include="PublicPortalInteraction.cs"/>
         <Compile Include="PublicPortalInteraction.Lifecycle.cs"/>
         <Compile Include="PublicPortalKinds.cs"/>
+        <Compile Include="PublicPortalProtection.cs"/>
         <Compile Include="PublicPortalMap.cs"/>
         <Compile Include="PublicPortalMapController.cs"/>
         <Compile Include="RequiredGlobalKeyAccess.cs"/>

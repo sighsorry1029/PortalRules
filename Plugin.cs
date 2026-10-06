@@ -15,17 +15,19 @@ namespace PortalRules;
 [BepInDependency(CurrencyPocketSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(EndosCoinPurseSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(YouAreNotWorthySoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(StuWardSoftDependencyGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInIncompatibility(TargetPortalIncompatibilityGuid)]
 public class PortalRulesPlugin : BaseUnityPlugin
 {
     internal const string ModName = "PortalRules";
-    internal const string ModVersion = "1.1.5";
+    internal const string ModVersion = "1.1.6";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
     internal const string ClanSoftDependencyGuid = "sighsorry.Clan";
     internal const string CurrencyPocketSoftDependencyGuid = "Azumatt.CurrencyPocket";
     internal const string EndosCoinPurseSoftDependencyGuid = "EndosCoinPurse";
     internal const string YouAreNotWorthySoftDependencyGuid = "sighsorry.YouAreNotWorthy";
+    internal const string StuWardSoftDependencyGuid = "sighsorry.STUWard";
     internal const string TargetPortalIncompatibilityGuid = "org.bepinex.plugins.targetportal";
     private readonly Harmony _harmony = new(ModGUID);
     public static readonly ManualLogSource PortalRulesLogger = BepInEx.Logging.Logger.CreateLogSource(ModName);
@@ -45,6 +47,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
             PortalRulesLocalization.Initialize();
             PublicPortalConfig.Initialize(Config);
             RequiredGlobalKeyAccess.Initialize();
+            PublicPortalProtection.InitializeStuWard();
 
             Assembly assembly = Assembly.GetExecutingAssembly();
             ClanPortalAccess.RegistryChanged += OnClanRegistryChanged;
@@ -75,8 +78,10 @@ public class PortalRulesPlugin : BaseUnityPlugin
         AdminPortalPrefabManager.Tick();
         PublicPortalMapController.Instance.Tick();
         PublicPortalConfig.Tick();
+        PublicPortalProtection.Tick();
         if (Interlocked.Exchange(ref _clanRegistryDirty, 0) != 0)
         {
+            PublicPortalProtection.InvalidatePresence();
             PublicPortalCatalog.RefreshClanViews();
         }
     }
@@ -90,6 +95,7 @@ public class PortalRulesPlugin : BaseUnityPlugin
             TryCleanup("connected portal HUD", PublicPortalConnectedHud.Shutdown);
             TryCleanup("portal catalog", PublicPortalCatalog.Shutdown);
             TryCleanup("server policy", PublicPortalServerPolicy.Shutdown);
+            TryCleanup("portal protection", PublicPortalProtection.Shutdown);
             TryCleanup("teleport service", PublicPortalTeleportService.Shutdown);
             TryCleanup("portal interaction", PublicPortalInteraction.Shutdown);
             TryCleanup("admin portal operations", AdminPortalOperations.Shutdown);

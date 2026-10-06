@@ -642,7 +642,7 @@ internal static class PublicPortalServerPolicy
                 bool hasValidView = instanceView != null && instanceView.IsValid();
                 if (wearNTear != null && hasValidView)
                 {
-                    wearNTear.Remove(blockDrop: true);
+                    PublicPortalProtection.RemoveForServerPolicy(wearNTear);
                 }
                 else
                 {

@@ -61,6 +61,8 @@ internal static class InviteTravelCooldownStore
         internal readonly InviteTravelCooldownReservation Value;
         internal readonly long ExpiresAtUtc;
         internal readonly long SerializedByteEstimate;
+        internal bool SourceRemoved;
+        internal bool DestinationRemoved;
 
         internal PendingReservation(
             InviteTravelCooldownReservation value,
@@ -319,21 +321,15 @@ internal static class InviteTravelCooldownStore
             return;
         }
 
-        foreach (PendingReservation pending in PendingReservations.Values
-                     .Where(candidate =>
-                         candidate.Value.RecordsDeparture &&
-                         string.Equals(
-                             candidate.Value.SourceFavoriteId,
-                             portalId,
-                             StringComparison.Ordinal) ||
-                         candidate.Value.RecordsArrival &&
-                         string.Equals(
-                             candidate.Value.DestinationFavoriteId,
-                             portalId,
-                             StringComparison.Ordinal))
-                     .ToArray())
+        foreach (PendingReservation pending in PendingReservations.Values)
         {
-            RemovePendingReservation(pending);
+            // A granted journey can already be in flight when its portal falls.
+            // Keep the original ticket and both direction locks until commit,
+            // cancellation or expiry, but never recreate the destroyed endpoint.
+            pending.SourceRemoved |= pending.Value.RecordsDeparture &&
+                string.Equals(pending.Value.SourceFavoriteId, portalId, StringComparison.Ordinal);
+            pending.DestinationRemoved |= pending.Value.RecordsArrival &&
+                string.Equals(pending.Value.DestinationFavoriteId, portalId, StringComparison.Ordinal);
         }
 
         bool changed = false;
@@ -648,6 +644,21 @@ internal static class InviteTravelCooldownStore
             return false;
         }
 
+        bool recordsDeparture = reservation.RecordsDeparture && !pending.SourceRemoved;
+        bool recordsArrival = reservation.RecordsArrival && !pending.DestinationRemoved;
+        if (!recordsDeparture && !recordsArrival)
+        {
+            // No endpoint remains to record, but deleting existing history must
+            // still reach disk before the travel commit can be acknowledged.
+            if (_saveDirty && !TryFlushPending(out _))
+            {
+                failure = InviteTravelCooldownFailure.SaveFailed;
+                return false;
+            }
+            RemovePendingReservation(pending);
+            return true;
+        }
+
         bool accountExisted = accounts.TryGetValue(
             reservation.AccountId,
             out Dictionary<string, CooldownEntry> portalEntries);
@@ -664,23 +675,23 @@ internal static class InviteTravelCooldownStore
 
         CooldownEntry sourcePrevious = default;
         CooldownEntry destinationPrevious = default;
-        bool sourceExisted = reservation.RecordsDeparture &&
+        bool sourceExisted = recordsDeparture &&
                              portalEntries.TryGetValue(
                                  reservation.SourceFavoriteId,
                                  out sourcePrevious);
-        bool destinationExisted = reservation.RecordsArrival &&
+        bool destinationExisted = recordsArrival &&
                                   portalEntries.TryGetValue(
                                       reservation.DestinationFavoriteId,
                                       out destinationPrevious);
         int newPortalCount = 0;
-        if (reservation.RecordsDeparture && !sourceExisted)
+        if (recordsDeparture && !sourceExisted)
         {
             newPortalCount++;
         }
 
-        if (reservation.RecordsArrival &&
+        if (recordsArrival &&
             !destinationExisted &&
-            (!reservation.RecordsDeparture ||
+            (!recordsDeparture ||
              !string.Equals(
                  reservation.SourceFavoriteId,
                  reservation.DestinationFavoriteId,
@@ -709,16 +720,16 @@ internal static class InviteTravelCooldownStore
 
         bool wasSaveDirty = _saveDirty;
         long previousSerializedByteUpperBound = _serializedByteUpperBound;
-        if (reservation.RecordsDeparture)
+        if (recordsDeparture)
         {
             portalEntries[reservation.SourceFavoriteId] =
                 sourcePrevious.WithDeparture(nowUtc);
         }
 
-        if (reservation.RecordsArrival)
+        if (recordsArrival)
         {
             CooldownEntry currentDestination =
-                reservation.RecordsDeparture &&
+                recordsDeparture &&
                 string.Equals(
                     reservation.SourceFavoriteId,
                     reservation.DestinationFavoriteId,
@@ -744,16 +755,14 @@ internal static class InviteTravelCooldownStore
             return true;
         }
 
-        RestoreEntry(
-            portalEntries,
-            reservation.SourceFavoriteId,
-            sourceExisted,
-            sourcePrevious);
-        RestoreEntry(
-            portalEntries,
-            reservation.DestinationFavoriteId,
-            destinationExisted,
-            destinationPrevious);
+        if (recordsDeparture)
+        {
+            RestoreEntry(portalEntries, reservation.SourceFavoriteId, sourceExisted, sourcePrevious);
+        }
+        if (recordsArrival)
+        {
+            RestoreEntry(portalEntries, reservation.DestinationFavoriteId, destinationExisted, destinationPrevious);
+        }
         if (portalEntries.Count == 0)
         {
             accounts.Remove(reservation.AccountId);

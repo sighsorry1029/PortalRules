@@ -28,6 +28,7 @@ internal static partial class PublicPortalInteraction
             PublicPortalTeleportService.RegisterPeer(__instance, peer);
             PublicPortalModeChangeEffects.RegisterPeer(__instance, peer);
             AdminPortalOperations.RegisterPeer(__instance, peer);
+            PublicPortalProtection.RegisterPeer(__instance, peer);
             if (__instance.IsServer())
             {
                 peer.m_rpc.Register<ZDOID, int, bool>(
@@ -51,6 +52,7 @@ internal static partial class PublicPortalInteraction
             PublicPortalCatalog.BeginNetworkSession(__instance);
             PublicPortalServerPolicy.BeginNetworkSession(__instance);
             PublicPortalTeleportService.BeginNetworkSession(__instance);
+            PublicPortalProtection.Shutdown();
         }
     }
 
@@ -98,6 +100,7 @@ internal static partial class PublicPortalInteraction
             PublicPortalServerPolicy.ForgetPeer(peer.m_rpc);
             PublicPortalTeleportService.ForgetPeer(peer.m_rpc);
             AdminPortalOperations.ForgetPeer(peer.m_rpc);
+            PublicPortalProtection.ForgetPeer(peer.m_rpc);
         }
     }
 
@@ -237,6 +240,7 @@ internal static partial class PublicPortalInteraction
     {
         private static void Prefix(ZDOID uid)
         {
+            PublicPortalProtection.ForgetPortal(uid);
             if (ZNet.instance != null && ZNet.instance.IsServer())
             {
                 PublicPortalCatalog.NotifyPortalDestroyed(uid);

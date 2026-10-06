@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)][string]$GameManaged,
     [Parameter(Mandatory = $true)][string]$BepInExCore,
     [Parameter(Mandatory = $true)][string]$CecilDll,
-    [string]$ModDll = (Join-Path (Split-Path $PSScriptRoot -Parent) 'bin\Debug\PortalRules.dll')
+    [string]$ModDll = (Join-Path (Split-Path $PSScriptRoot -Parent) 'bin\Debug\PortalRules.dll'),
+    [string]$StuWardDll
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -Path $CecilDll
@@ -89,6 +90,16 @@ try {
         }
         $target = $targets[0]
         $patches++
+        if ($type.FullName.StartsWith('PortalRules.PublicPortalProtection/') -and
+            $targetType.Name -eq 'WearNTear') {
+            if ($targetName -in @('ApplyDamage', 'UpdateSupport', 'HaveSupport', 'Destroy')) {
+                $failures.Add('Portal protection must preserve actual support calculation, other damage, and general destruction')
+            }
+            if ($targetName -eq 'UpdateWear' -and
+                @($type.Methods | Where-Object Name -in @('Prefix', 'Postfix', 'Finalizer')).Count) {
+                $failures.Add('Support protection must only gate the specific collapse branch, not skip UpdateWear')
+            }
+        }
         foreach ($patch in ($type.Methods | Where-Object Name -in @('Prefix', 'Postfix', 'Finalizer'))) {
             foreach ($parameter in $patch.Parameters) {
                 if ($parameter.Name.StartsWith('___')) {
@@ -196,9 +207,64 @@ try {
         $_.Operand -is [Mono.Cecil.MethodReference] -and
         $_.Operand.Name -eq 'remove_SettingChanged'
     }).Count
-    if ($settingAdds -ne 9 -or $settingRemoves -ne 9) {
+    if ($settingAdds -ne 10 -or $settingRemoves -ne 10) {
         $failures.Add(
             "Live config subscriptions are not symmetric: add=$settingAdds remove=$settingRemoves")
+    }
+    $wear = $game.Types | Where-Object Name -eq 'WearNTear'
+    $haveSupport = @($wear.Methods | Where-Object Name -eq 'HaveSupport')
+    if ($haveSupport.Count -ne 1 -or !$haveSupport[0].IsPrivate -or
+        $haveSupport[0].ReturnType.FullName -ne 'System.Boolean' -or $haveSupport[0].Parameters.Count -ne 0) {
+        $failures.Add('Support decision target changed: private WearNTear.HaveSupport()')
+    }
+    $updateWear = $wear.Methods | Where-Object Name -eq 'UpdateWear'
+    $supportCalls = 0
+    $supportAnchors = 0
+    $wearInstructions = $updateWear.Body.Instructions
+    for ($i = 0; $i -lt $wearInstructions.Count; $i++) {
+        $operand = $wearInstructions[$i].Operand
+        if ($operand -isnot [Mono.Cecil.MethodReference] -or $operand.DeclaringType.Name -ne 'WearNTear' -or
+            $operand.Name -ne 'HaveSupport') { continue }
+        $supportCalls++
+        if ($i + 3 -lt $wearInstructions.Count -and
+            $wearInstructions[$i + 1].OpCode.Name -in @('brtrue', 'brtrue.s') -and
+            $wearInstructions[$i + 2].OpCode.Name -eq 'ldc.r4' -and
+            $wearInstructions[$i + 2].Operand -eq [single]100 -and
+            $wearInstructions[$i + 3].OpCode.Name.StartsWith('stloc')) { $supportAnchors++ }
+    }
+    if ($supportCalls -ne 1 -or $supportAnchors -ne 1) {
+        $failures.Add("Unexpected unsupported-collapse transpiler anchor: calls=$supportCalls anchors=$supportAnchors")
+    }
+    $removeRpc = @($wear.Methods | Where-Object Name -eq 'RPC_Remove')
+    if ($removeRpc.Count -ne 1 -or !$removeRpc[0].IsPrivate -or
+        (($removeRpc[0].Parameters | ForEach-Object { $_.ParameterType.FullName }) -join '|') -ne 'System.Int64|System.Boolean') {
+        $failures.Add('Authenticated removal reflection target changed: private WearNTear.RPC_Remove(long, bool)')
+    }
+    $wardApiContracts = 0
+    if (@($module.AssemblyReferences | Where-Object Name -eq 'STUWard').Count) {
+        $failures.Add('STUWard must remain optional, without a hard assembly reference')
+    }
+    $pluginType = $module.Types | Where-Object FullName -eq 'PortalRules.PortalRulesPlugin'
+    $wardDependency = @($pluginType.CustomAttributes | Where-Object {
+        $_.AttributeType.FullName -eq 'BepInEx.BepInDependency' -and
+        $_.ConstructorArguments[0].Value -eq 'sighsorry.STUWard'
+    })
+    if ($wardDependency.Count -ne 1 -or $wardDependency[0].ConstructorArguments[1].Value -ne 2) {
+        $failures.Add('STUWard load ordering must use a soft dependency')
+    }
+    if ($StuWardDll) {
+        $wardModule = [Mono.Cecil.ModuleDefinition]::ReadModule($StuWardDll, $parameters)
+        try {
+            $wardApi = $wardModule.Types | Where-Object FullName -eq 'STUWard.WardAccessApi'
+            $query = @($wardApi.Methods | Where-Object Name -eq 'IsInsideActiveWard')
+            if (!$wardApi.IsPublic -or $query.Count -ne 1 -or !$query[0].IsPublic -or !$query[0].IsStatic -or
+                $query[0].ReturnType.FullName -ne 'System.Boolean' -or $query[0].Parameters.Count -ne 1 -or
+                $query[0].Parameters[0].ParameterType.FullName -ne 'UnityEngine.Vector3') {
+                $failures.Add('Final STUWard DLL does not expose public static bool IsInsideActiveWard(Vector3)')
+            }
+            else { $wardApiContracts = 1 }
+        }
+        finally { $wardModule.Dispose() }
     }
     if ($failures.Count) { throw ($failures -join "`n") }
     [pscustomobject]@{
@@ -210,8 +276,10 @@ try {
         DynamicHammerTargetsChecked = 2
         PrivateFieldContractsChecked = 5
         WheelTranspilerAnchors = $wheelMatches
+        SupportCollapseTranspilerAnchors = $supportAnchors
         ConfigPersistenceContractsChecked = 4
         LiveConfigSubscriptionsChecked = $settingAdds
+        StuWardCoverageApiContractsChecked = $wardApiContracts
         Note = 'Static metadata/IL checks; does not install Harmony patches or execute Unity.'
     } | ConvertTo-Json -Depth 4
 }

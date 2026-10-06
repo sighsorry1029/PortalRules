@@ -129,3 +129,5 @@ sighsorry_portalrules_portal_limit_placement_blocked: "You can place at most {0}
 sighsorry_portalrules_duration_minutes: "{0}m"
 sighsorry_portalrules_duration_hours: "{0}h"
 sighsorry_portalrules_duration_hours_minutes: "{0}h {1}m"
+sighsorry_portalrules_protected_removal_denied: "Only the Builder, their trusted Clan players, or an admin in debug mode can dismantle this portal."
+sighsorry_portalrules_protected_removal_retry: "Portal dismantling could not be verified. Move closer and try again shortly."

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.6
+
+- Added the server-synchronized `Enable Portal Protection` setting, disabled by default. Outside active STUWard areas, protected player portals block player and tamed-creature attacks; dismantling requires the original Builder's account, trusted Clan membership, or administrator debug access.
+- Protected portals resist hostile-creature attacks while unattended and allow unsupported collapse only while a living trusted player is nearby. Combat uses a 40-metre presence range and 10-second departure grace; collapse has no departure grace. Actual support values and other environmental wear remain unchanged.
+- Added optional STUWard 1.3.18 integration. Inside an active ward, portal damage and dismantling follow STUWard's rules and unsupported collapse works normally. PortalRules protection resumes outside active coverage; unavailable or failed integration keeps PortalRules protection in place.
+- Fixed Invite cooldown commits when a portal is destroyed during an in-flight journey. The destroyed portal's history stays deleted, while a surviving Invite endpoint still records its cooldown without releasing the pending journey early.
+- Added protection, ward-transition, removal-authority and Invite-destruction regression checks. Update PortalRules on the host/server and clients together, and update STUWard too when using the integration. Portal travel permissions and fares are unchanged.
+
 ## 1.1.5
 
 - Increased the portal-map click radius by one third, making both destination selection and favorite toggling easier while still choosing the nearest portal.

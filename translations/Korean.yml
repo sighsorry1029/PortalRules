@@ -129,3 +129,5 @@ sighsorry_portalrules_portal_limit_placement_blocked: "포탈은 계정당 최�
 sighsorry_portalrules_duration_minutes: "{0}분"
 sighsorry_portalrules_duration_hours: "{0}시간"
 sighsorry_portalrules_duration_hours_minutes: "{0}시간 {1}분"
+sighsorry_portalrules_protected_removal_denied: "설치자, 설치자의 신뢰 클랜원 또는 디버그 모드의 관리자만 이 포탈을 해체할 수 있습니다."
+sighsorry_portalrules_protected_removal_retry: "포탈 해체를 확인할 수 없습니다. 가까이 이동한 뒤 잠시 후 다시 시도하세요."
