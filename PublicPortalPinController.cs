@@ -466,11 +466,7 @@ internal sealed class PublicPortalPinController
         string modeLine = portal.AccessMode switch
         {
             PublicPortalAccessMode.Invite =>
-                BuildModeLine(
-                    PublicPortalInteraction.AccessModeLabel(
-                        PublicPortalAccessMode.Invite),
-                    portal.ModeOrdinal,
-                    portal.ModeLimit),
+                BuildInviteModeLine(portal),
             PublicPortalAccessMode.Clan =>
                 BuildModeLine(
                     PublicPortalInteraction.AccessModeLabel(
@@ -488,6 +484,23 @@ internal sealed class PublicPortalPinController
         return string.IsNullOrEmpty(modeLine)
             ? tag
             : $"{tag}\n{modeLine}";
+    }
+
+    private static string BuildInviteModeLine(PublicPortalCatalogEntry portal)
+    {
+        string label = PublicPortalInteraction.AccessModeLabel(
+            PublicPortalAccessMode.Invite);
+        if (PublicPortalData.IsLocalOwner(portal.Owner))
+        {
+            return BuildModeLine(label, portal.ModeOrdinal, portal.ModeLimit);
+        }
+
+        string builderName = SanitizePinLine(portal.Owner.Name);
+        return string.IsNullOrEmpty(builderName)
+            ? label
+            : PortalRulesLocalization.Translate(
+                "$sighsorry_portalrules_invite_name_with_owner",
+                builderName);
     }
 
     private static string BuildModeLine(

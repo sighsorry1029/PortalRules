@@ -82,7 +82,7 @@ Changing `Default Portal Mode` affects future ordinary player placements only, i
 
 `Clan` falls back to `Personal` if the Builder's primary Clan cannot be verified or its quota is full or unavailable. `Public` uses the configured Public timer. Expiry is an absolute UTC deadline: server downtime and unloaded regions still count. Admin prefabs and Builderless portals are excluded.
 
-The Builder is immutable; interacting with a portal does not transfer its attribution. Mode changes normally allow the Builder, Primary or Guest members of the Builder's current primary Clan, or a server administrator in debug mode. Entering or leaving Invite remains Builder-only. Without a resolvable primary Clan, mode changes are limited to the Builder or an administrator in debug mode. See the [player guide](https://github.com/sighsorry1029/PortalRules/blob/main/docs/user-guide.md) for each mode's travel rules.
+The Builder is immutable; interacting with a portal does not transfer its attribution. Mode changes normally allow the Builder, Primary or Guest members of the Builder's current primary Clan, or a server administrator in debug mode. Entering or leaving Invite requires the Builder's account or an administrator in debug mode; the original Builder's Invite limit still applies. Clan membership alone does not allow Invite changes. Without a resolvable primary Clan, mode changes are limited to the Builder or an administrator in debug mode. See the [player guide](https://github.com/sighsorry1029/PortalRules/blob/main/docs/user-guide.md) for each mode's travel rules.
 
 ### Overall, Invite, and Clan limits
 

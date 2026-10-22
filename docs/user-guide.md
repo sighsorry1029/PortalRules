@@ -47,7 +47,7 @@ The following players may cycle an ordinary portal's modes:
 - Primary or Guest members of the Builder's current primary Clan.
 - A server administrator in debug mode.
 
-Entering or leaving Invite is always Builder-only, including for administrators. A Guest can help change a Clan member's portal, but Guest-only membership does not let that Guest assign their own portal to the guest Clan: assignment still needs the Builder's primary Clan. If the Builder has no resolvable primary Clan, only the Builder or an administrator in debug mode may change modes.
+Entering or leaving Invite requires the Builder's account or an administrator in debug mode. Administrators keep the original Builder attribution and must respect that Builder's Invite limit. Clan membership alone does not allow Invite changes. A Guest can help change a Clan member's portal, but Guest-only membership does not let that Guest assign their own portal to the guest Clan: assignment still needs the Builder's primary Clan. If the Builder has no resolvable primary Clan, only the Builder or an administrator in debug mode may change modes.
 
 Clan access requires the server's compatible Clan API integration, version 4 or later. If it is missing or cannot verify membership, Clan selection and non-Builder Clan access are denied; ordinary Tagged portals remain Builder-only without verified Clan access.
 
@@ -92,7 +92,7 @@ The optional Clan integration still needs a verified Steam identity for remote m
 
 Portal pins show access modes, tags, travel restrictions, fares, and ownership or quota indicators. Invite cooldowns also appear on pins or favorite rows. A portal visible on the map can still be temporarily unavailable for travel because of cargo, payment, or cooldown requirements.
 
-The quota labels `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show each portal's position within its quota. When the overall account limit is unlimited, the own-portal label is simply `My portal n`.
+The quota labels `My portal n/limit`, `Invite n/limit`, and `Clan n/limit` show each portal's position within its quota. When the overall account limit is unlimited, the own-portal label is simply `My portal n`. Invite quota labels appear only for the Builder's account; other players see `Builder's Invite`, or just `Invite` if the Builder's name is unavailable. Custom tags remain above this label. Invite hover text likewise shows ownership counts only to the Builder's account; cooldown information remains visible to everyone.
 
 Favorites make repeated trips easier:
 

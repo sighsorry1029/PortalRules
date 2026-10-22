@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.7
+
+- Allow server administrators in debug mode to switch another player's portal into or out of Invite mode. The original Builder and that Builder's Invite limit are preserved; Clan membership alone does not grant this permission.
+- Show other players' Invite map pins as `Builder's Invite` instead of an ordinal and quota. Custom tags remain on the first line, and the Builder's account keeps its own quota labels.
+- Show Invite ownership counts in portal hover text only to the Builder's account, while keeping cooldown information visible to other players. Updated English and Korean text.
+- Added regression checks for Invite editing permissions, Builder-based limits, and map labels. Update the host/server and clients together.
+
 ## 1.1.6
 
 - Added the server-synchronized `Enable Portal Protection` setting, disabled by default. Outside active STUWard areas, protected player portals block player and tamed-creature attacks; dismantling requires the original Builder's account, trusted Clan membership, or administrator debug access.

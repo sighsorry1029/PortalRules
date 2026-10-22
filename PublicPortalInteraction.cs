@@ -318,7 +318,8 @@ internal static partial class PublicPortalInteraction
         }
 
         bool isAdminPortal = IsAdminPortal(zdo);
-        if (isAdminPortal && (!requesterIsAdmin || !requesterDebugEnabled))
+        bool requesterHasAdminDebugAccess = requesterIsAdmin && requesterDebugEnabled;
+        if (isAdminPortal && !requesterHasAdminDebugAccess)
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_admin_portal_change_requires_admin_debug");
@@ -355,7 +356,8 @@ internal static partial class PublicPortalInteraction
 
         if (!isAdminPortal &&
             currentMode == PublicPortalAccessMode.Invite &&
-            !requesterIsBuilder)
+            !requesterIsBuilder &&
+            !requesterHasAdminDebugAccess)
         {
             message = new PortalRulesMessage(
                 "$sighsorry_portalrules_invite_access_change_builder_only");
@@ -364,7 +366,7 @@ internal static partial class PublicPortalInteraction
 
         if (!isAdminPortal &&
             !requesterIsBuilder &&
-            !(requesterIsAdmin && requesterDebugEnabled) &&
+            !requesterHasAdminDebugAccess &&
             !ClanPortalAccess.IsRequesterInBuilderPrimaryClan(
                 builder,
                 requesterPeer))
@@ -377,7 +379,7 @@ internal static partial class PublicPortalInteraction
         if (!TryResolveNextAccessMode(
                 currentMode,
                 isAdminPortal,
-                requesterIsAdmin,
+                requesterHasAdminDebugAccess,
                 requesterIsBuilder,
                 builder,
                 out PublicPortalAccessMode requestedMode,
@@ -439,7 +441,7 @@ internal static partial class PublicPortalInteraction
     private static bool TryResolveNextAccessMode(
         PublicPortalAccessMode currentMode,
         bool isAdminPortal,
-        bool requesterIsAdmin,
+        bool requesterHasAdminDebugAccess,
         bool requesterIsBuilder,
         PortalBuilder builder,
         out PublicPortalAccessMode nextMode,
@@ -461,14 +463,14 @@ internal static partial class PublicPortalInteraction
             nextMode = candidate;
 
             if (candidate == PublicPortalAccessMode.Admin &&
-                !requesterIsAdmin)
+                !requesterHasAdminDebugAccess)
             {
                 continue;
             }
 
             if (candidate == PublicPortalAccessMode.Invite)
             {
-                if (!requesterIsBuilder ||
+                if ((!requesterIsBuilder && !requesterHasAdminDebugAccess) ||
                     !PublicPortalServerPolicy.TryGetInviteQuotaState(
                         builder.AccountId,
                         out int currentCount,
@@ -690,10 +692,13 @@ internal static partial class PublicPortalInteraction
                         zdo.m_uid,
                         out PublicPortalCatalogEntry entry))
                 {
-                    inviteInfo = PortalRulesLocalization.Translate(
-                        "$sighsorry_portalrules_hover_invite_description_with_quota",
-                        entry.ModeCurrent.ToString(),
-                        FormatPortalLimit(entry.ModeLimit));
+                    if (PublicPortalData.IsLocalOwner(entry.Owner))
+                    {
+                        inviteInfo = PortalRulesLocalization.Translate(
+                            "$sighsorry_portalrules_hover_invite_description_with_quota",
+                            entry.ModeCurrent.ToString(),
+                            FormatPortalLimit(entry.ModeLimit));
+                    }
                     long cooldownRemainingSeconds =
                         InviteTravelCooldownStore.GetRemainingSeconds(
                             entry.InviteDepartureCooldownUntilUtc);

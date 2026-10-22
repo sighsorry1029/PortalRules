@@ -118,7 +118,7 @@ internal static class PublicPortalAccess
         if (PublicPortalCatalog.GetEffectiveAccessMode(zdo) ==
             PublicPortalAccessMode.Invite)
         {
-            return false;
+            return PortalRulesPlugin.HasAdminDebugAccess;
         }
 
         if (ZNet.instance != null && !ZNet.instance.IsServer())

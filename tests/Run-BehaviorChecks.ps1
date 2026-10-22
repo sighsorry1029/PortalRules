@@ -90,5 +90,17 @@ $modeChangeMethods = @(
 $modeChangeFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'PortalModeChangeChecks.cs'))
 Add-Type -TypeDefinition ($modeChangeFixture.Replace('/* ENUMS */', ($modeEnums -join "`n")).
     Replace('/* REQUEST_METHOD */', (Read-Method 'PublicPortalAccess.cs' 'CanRequestAccessModeChange')).
+    Replace('/* ADMIN_PROPERTIES */', ((Read-Property 'Plugin.cs' 'IsAdmin') + "`n" +
+        (Read-Property 'Plugin.cs' 'HasAdminDebugAccess'))).
     Replace('/* SERVER_METHODS */', $modeChangeMethods))
 [PortalRulesModeChangeChecks]::Run()
+
+$pinLabelMethods = @('BuildPinName', 'BuildInviteModeLine', 'BuildModeLine', 'FormatLimit',
+    'SanitizePinLine') | ForEach-Object { Read-Method 'PublicPortalPinController.cs' $_ }
+$pinLabelFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'PortalPinLabelChecks.cs'))
+Add-Type -TypeDefinition ($pinLabelFixture.Replace('/* ENUMS */', ($modeEnums -join "`n")).
+    Replace('/* OWNER_METHOD */', (Read-Method 'PublicPortalData.cs' 'IsLocalOwner')).
+    Replace('/* LABEL_METHODS */', ($pinLabelMethods -join "`n"))) -ReferencedAssemblies ($frameworkRefs + $yamlDll)
+[PortalRulesPinLabelChecks]::Run(
+    [IO.File]::ReadAllText((Join-Path $ProjectRoot 'translations\English.yml')),
+    [IO.File]::ReadAllText((Join-Path $ProjectRoot 'translations\Korean.yml')))

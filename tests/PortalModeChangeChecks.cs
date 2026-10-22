@@ -63,7 +63,11 @@ public static class PortalRulesModeChangeChecks
         internal string PrimaryClanName => "Builder Clan";
         internal bool HasPrimaryClan => true;
     }
-    private static class PortalRulesPlugin { internal static bool HasAdminDebugAccess; }
+    private static class Player { internal static bool m_debugMode; }
+    private static class PortalRulesPlugin
+    {
+        /* ADMIN_PROPERTIES */
+    }
     private static class PublicPortalInteraction
     {
         internal static bool IsAdminPortal(ZDO zdo) => zdo.Admin;
@@ -71,6 +75,7 @@ public static class PortalRulesModeChangeChecks
     private static class PublicPortalData
     {
         internal static string LocalAccount = "editor-account";
+        internal static bool ServerAssignedIsAdmin;
         internal static PortalBuilder GetBuilder(ZDO zdo) => zdo.Builder;
         internal static bool TryGetLocalAccountId(out string account)
         {
@@ -139,6 +144,9 @@ public static class PortalRulesModeChangeChecks
     {
         internal static int ClanLimit;
         internal static int InviteLimit;
+        internal static int InviteCount;
+        internal static bool InviteQuotaAvailable;
+        internal static string InviteQuotaAccount = "";
         internal static bool TryGetClanQuotaState(string clan, out int count, out int limit)
         {
             count = 0;
@@ -147,9 +155,10 @@ public static class PortalRulesModeChangeChecks
         }
         internal static bool TryGetInviteQuotaState(string account, out int count, out int limit)
         {
-            count = 0;
+            InviteQuotaAccount = account;
+            count = InviteCount;
             limit = InviteLimit;
-            return true;
+            return InviteQuotaAvailable;
         }
     }
     private static class PublicPortalKinds
@@ -194,7 +203,8 @@ public static class PortalRulesModeChangeChecks
         _writtenClan = "";
         ZNet.instance = new ZNet { Server = server };
         ZDOMan.instance = new ZDOMan();
-        PortalRulesPlugin.HasAdminDebugAccess = false;
+        Player.m_debugMode = false;
+        PublicPortalData.ServerAssignedIsAdmin = false;
         PublicPortalData.LocalAccount = "editor-account";
         ClanPortalAccess.IsServerRegistryAvailable = true;
         ClanPortalAccess.LocalInBuilderClan = false;
@@ -202,6 +212,9 @@ public static class PortalRulesModeChangeChecks
         ClanPortalAccess.AuthorizedPeer = null;
         ClanPortalAccess.PermissionQueries = 0;
         PublicPortalServerPolicy.ClanLimit = PublicPortalServerPolicy.InviteLimit = 1;
+        PublicPortalServerPolicy.InviteCount = 0;
+        PublicPortalServerPolicy.InviteQuotaAvailable = true;
+        PublicPortalServerPolicy.InviteQuotaAccount = "";
     }
     private static bool CanRequest() => PublicPortalAccess.CanRequestAccessModeChange(_portal);
     private static bool Apply(ZNetPeer peer, bool admin = false, bool debug = false, int operation = -1) =>
@@ -219,16 +232,21 @@ public static class PortalRulesModeChangeChecks
         ClanPortalAccess.IsServerRegistryAvailable = false;
         Check(CanRequest(), "Local optional-mod availability cannot establish server edit permission");
         _portal.Mode = PublicPortalAccessMode.Invite;
-        Check(!CanRequest(), "Invite stays builder-only on the client");
-        PortalRulesPlugin.HasAdminDebugAccess = true;
-        Check(!CanRequest(), "Admin debug does not bypass ordinary Invite builder-only gate");
+        Check(!CanRequest(), "Non-builder cannot request an Invite transition without admin debug");
+        Player.m_debugMode = true;
+        Check(!CanRequest(), "Local debug alone does not establish server admin permission");
+        PublicPortalData.ServerAssignedIsAdmin = true;
+        Player.m_debugMode = false;
+        Check(!CanRequest(), "Server-confirmed admin still requires debug to change another account's Invite portal");
+        Player.m_debugMode = true;
+        Check(CanRequest(), "Server-confirmed admin with debug can request an Invite transition");
         PublicPortalData.LocalAccount = "builder-account";
         Check(CanRequest(), "Builder can request an Invite transition");
         _portal.Builder = new PortalBuilder("", "");
         Check(!CanRequest(), "Unverified builder remains blocked");
         _portal.Admin = true;
         Check(CanRequest(), "Admin prefab remains available to admin debug");
-        PortalRulesPlugin.HasAdminDebugAccess = false;
+        Player.m_debugMode = false;
         Check(!CanRequest(), "Admin prefab remains blocked without admin debug");
         Check(!PublicPortalAccess.CanRequestAccessModeChange(null!), "Missing portal remains blocked");
 
@@ -259,13 +277,66 @@ public static class PortalRulesModeChangeChecks
         Check(Apply(peer) && _writtenMode == PublicPortalAccessMode.Public, "Full clan quota still skips Clan");
         Reset(server: true);
         _portal.Mode = PublicPortalAccessMode.Public;
-        Check(Apply(peer) && _writtenMode == PublicPortalAccessMode.Tagged, "Non-builder skips builder-only Invite candidate");
+        Check(Apply(peer) && _writtenMode == PublicPortalAccessMode.Tagged, "Clan member without admin debug skips Invite candidate");
         Reset(server: true);
         _portal.Mode = PublicPortalAccessMode.Invite;
         Denied(peer, "Server rejects clan-member changes to an Invite portal");
-        Denied(peer, "Server rejects non-builder Invite changes even in admin debug", admin: true, debug: true);
+        Denied(peer, "Invite change requires debug even for an administrator", admin: true);
+        Denied(peer, "Claiming debug does not let a non-admin change Invite", debug: true);
         peer.AccountId = "builder-account";
         Check(Apply(peer) && _writtenMode == PublicPortalAccessMode.Tagged, "Original builder can leave Invite");
+        peer = new ZNetPeer { InBuilderClan = false };
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Invite;
+        PublicPortalServerPolicy.InviteLimit = 0;
+        Check(Apply(peer, admin: true, debug: true) && _writtenMode == PublicPortalAccessMode.Tagged,
+            "Admin debug can leave another account's Invite portal even if Invite is now disabled");
+        Check(_writes == 1 && _effects == 1 && _refreshes == 1,
+            "Admin Invite change uses the normal catalog and effect path exactly once");
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Public;
+        Check(Apply(peer, admin: true, debug: true) && _writtenMode == PublicPortalAccessMode.Invite,
+            "Admin debug can enter Invite on another account's portal without Clan membership");
+        Check(PublicPortalServerPolicy.InviteQuotaAccount == "builder-account",
+            "Admin Invite entry checks the original builder's quota, not the administrator's account");
+        foreach (string quotaState in new[] { "disabled", "full", "unavailable", "unlimited" })
+        {
+            Reset(server: true);
+            _portal.Mode = PublicPortalAccessMode.Public;
+            PublicPortalServerPolicy.InviteLimit = quotaState == "disabled" ? 0 : quotaState == "unlimited" ? -1 : 1;
+            PublicPortalServerPolicy.InviteCount = 1;
+            PublicPortalServerPolicy.InviteQuotaAvailable = quotaState != "unavailable";
+            Check(Apply(peer, admin: true, debug: true) && _writtenMode ==
+                (quotaState == "unlimited" ? PublicPortalAccessMode.Invite : PublicPortalAccessMode.Tagged),
+                "Admin debug respects builder Invite quota: " + quotaState);
+        }
+        foreach (bool admin in new[] { false, true })
+        {
+            Reset(server: true);
+            _portal.Mode = PublicPortalAccessMode.Public;
+            var clanPeer = new ZNetPeer();
+            Check(Apply(clanPeer, admin: admin, debug: !admin) && _writtenMode == PublicPortalAccessMode.Tagged,
+                "Clan editor cannot enter Invite with only admin or only debug");
+        }
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Public;
+        Check(Apply(new ZNetPeer { AccountId = "builder-account", InBuilderClan = false }) &&
+              _writtenMode == PublicPortalAccessMode.Invite, "Builder can still enter Invite without admin or Clan");
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Invite;
+        _nearPortal = false;
+        Denied(peer, "Admin debug does not bypass portal interaction validation", admin: true, debug: true);
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Invite;
+        _portal.Builder = new PortalBuilder("", "");
+        Denied(peer, "Admin debug still requires a verified original builder", admin: true, debug: true);
+        Reset(server: true);
+        _portal.Mode = PublicPortalAccessMode.Invite;
+        Player.m_debugMode = true;
+        Check(CanRequest(), "Local host with debug can request another account's Invite transition");
+        Check(TryApplyAccessModeChange(_portal.m_uid, -1, null, PortalRulesPlugin.IsAdmin,
+                  Player.m_debugMode, out var hostMode, out _) && hostMode == PublicPortalAccessMode.Tagged,
+            "Local host follows the same admin debug server authorization");
         peer = new ZNetPeer { InBuilderClan = false };
         Reset(server: true);
         Denied(peer, "Server rejects an unrelated requester even if the client offers Shift+E");
