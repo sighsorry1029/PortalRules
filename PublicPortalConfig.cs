@@ -161,7 +161,7 @@ internal static class PublicPortalConfig
         DefaultPortalMode = ConfigEntry(
             "3 - Access Modes",
             "Default Portal Mode",
-            PublicPortalDefaultMode.Personal,
+            PublicPortalDefaultMode.Public,
             new ConfigDescription(
                 "Initial access mode for newly placed non-Admin player portals. " +
                 "Clan falls back to Personal if the Builder's primary Clan cannot be verified or its portal limit is reached/unavailable. " +
@@ -174,7 +174,7 @@ internal static class PublicPortalConfig
         PublicAccessDurationSeconds = ConfigEntry(
             "3 - Access Modes",
             "Public Access Duration Seconds",
-            900,
+            0,
             new ConfigDescription(
                 "Seconds before a player-built Public portal returns to its authenticated Builder's Personal access. 0 disables automatic reversion.",
                 new AcceptableValueRange<int>(0, 604800)),

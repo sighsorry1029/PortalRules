@@ -28,8 +28,8 @@ The main file is `BepInEx/config/sighsorry.PortalRules.cfg`. It is generated on 
 | `Lock Configuration` | `On` | Restricts configuration changes to server administrators. |
 | `Enable Portal Protection` | `Off` | Restricts player-portal dismantling and blocks player/tamed attacks; protects unattended portals from hostile creature attacks and unsupported collapse. Environmental wear remains normal. |
 | `Enable Portal Map` | `On` | Opens destination selection for handled non-Tagged portals. `Off` uses connected destinations while retaining server authorization. |
-| `Default Portal Mode` | `Personal` | Initial mode for newly placed ordinary player portals: `Personal`, `Clan`, or `Public`. |
-| `Public Access Duration Seconds` | `900` | Returns eligible Public portals to Personal after 15 minutes. `0` disables expiry. |
+| `Default Portal Mode` | `Public` | Initial mode for newly placed ordinary player portals: `Personal`, `Clan`, or `Public`. |
+| `Public Access Duration Seconds` | `0` | Disables expiry by default. A positive duration returns eligible Public portals to Personal after that many seconds. |
 | `Max Invite Portals Per Account` | `0` | Invite portals per authenticated account. `-1` is unlimited; `0` disables Invite. |
 | `Invite Departure Cooldown Hours` | `1` | Per-account, per-Invite-portal departure cooldown. `0` disables it. |
 | `Invite Arrival Cooldown Hours` | `1` | Separate per-account, per-Invite-portal arrival cooldown. `0` disables it. |

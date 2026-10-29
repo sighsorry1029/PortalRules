@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.8
+
+- Changed `Default Portal Mode` to `Public` and `Public Access Duration Seconds` to `0` by default, so new ordinary player portals start Public without automatic expiry in new configurations.
+- Existing saved settings are preserved. To use these defaults on an existing server, set both options explicitly. A positive Public duration still returns eligible portals to Personal after the configured time.
+- Updated the player and server guides and the required BepInExPack Valheim dependency to `5.4.2360`. Update the host/server and clients together.
+
 ## 1.1.7
 
 - Allow server administrators in debug mode to switch another player's portal into or out of Invite mode. The original Builder and that Builder's Invite limit are preserved; Clan membership alone does not grant this permission.

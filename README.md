@@ -34,7 +34,7 @@ Use **Left Shift + Interact** to cycle available modes when you have permission.
 | --- | --- |
 | <a href="https://i.ibb.co/5XxGzsbk/publicportal.png"><img src="https://i.ibb.co/5XxGzsbk/publicportal.png" alt="Public portal hover text" width="320"></a> | <a href="https://i.ibb.co/0RK1gXMh/taggedportal.png"><img src="https://i.ibb.co/0RK1gXMh/taggedportal.png" alt="Tagged portal hover text with connection status" width="320"></a> |
 
-Public opens a player-built portal to visitors for **15 minutes by default**, then returns it to Personal. Tagged uses matching tags for direct connected travel instead of destination selection.
+New player-built portals start in **Public with no expiry by default**. Set Public Access Duration Seconds above `0` to return Public portals to Personal after a chosen duration. Tagged uses matching tags for direct connected travel instead of destination selection.
 
 | Clan access | Invite access |
 | --- | --- |
