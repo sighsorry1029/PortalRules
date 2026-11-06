@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 # This does not execute Unity or simulate the complete game inventory implementation.
 function Read-Method([string]$file, [string]$name) {
     $source = [IO.File]::ReadAllText((Join-Path $ProjectRoot $file))
-    $pattern = '(?ms)^    (?:private|internal|public) (?:static )?[^\r\n]*\b' +
+    $pattern = '(?ms)^    (?:private|internal|public) (?:static )?[^\r\n=;]*\b' +
         [regex]::Escape($name) + '\(.*?^    \}'
     $matches = [regex]::Matches($source, $pattern)
     if ($matches.Count -ne 1) { throw "Expected one method: $file / $name" }
@@ -52,7 +52,9 @@ Add-Type -TypeDefinition $crossplay -ReferencedAssemblies ($frameworkRefs + $yam
 $cursorFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'MapCursorChecks.cs'))
 $cursorFixture = $cursorFixture.Replace('/* CURSOR_METHOD */',
     (Read-Method 'PublicPortalMapController.cs' 'EnsureSelectionCursor')).Replace('/* OPEN_METHOD */',
-    (Read-Method 'PublicPortalMapController.cs' 'OpenMapAt'))
+    (Read-Method 'PublicPortalMapController.cs' 'OpenMapAt')).Replace('/* DRAG_METHODS */',
+    ((Read-Method 'PublicPortalMapController.cs' 'RecoverReleasedMapDrag') + "`n" +
+        (Read-Method 'PublicPortalMapController.cs' 'CreateMapDragReset')))
 Add-Type -TypeDefinition $cursorFixture
 [PortalRulesMapCursorChecks.Checks]::Run()
 

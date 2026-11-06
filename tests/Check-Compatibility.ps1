@@ -122,18 +122,22 @@ try {
     $gameReference = $module.AssemblyReferences | Where-Object Name -eq 'assembly_valheim'
     $game = $resolver.Resolve($gameReference).MainModule
     # Original private members accessed through cached FieldRefs or exact Harmony targets.
+    $privateFields = 0
     foreach ($contract in @(
         @('ZNetScene', 'm_namedPrefabs', 'System.Collections.Generic.Dictionary`2<System.Int32,UnityEngine.GameObject>'),
         @('ObjectDB', 'm_buildPieces', 'System.Collections.Generic.List`1<Piece>'),
         @('PieceTable', 'm_availablePiecesByCategory', 'System.Collections.Generic.List`1<System.Collections.Generic.List`1<Piece>>'),
         @('Minimap', 'm_visibleIconTypes', 'System.Boolean[]'),
-        @('Minimap', 'm_largeZoom', 'System.Single')
+        @('Minimap', 'm_largeZoom', 'System.Single'),
+        @('Minimap', 'm_leftDownTime', 'System.Single'),
+        @('Minimap', 'm_dragView', 'System.Boolean')
     )) {
         $owner = $game.Types | Where-Object Name -eq $contract[0]
         $field = $owner.Fields | Where-Object Name -eq $contract[1]
         if (!$field -or $field.FieldType.FullName -ne $contract[2]) {
             $failures.Add("Cached private field contract changed: $($contract[0]).$($contract[1])")
         }
+        else { $privateFields++ }
     }
     $objectDb = $game.Types | Where-Object Name -eq 'ObjectDB'
     foreach ($name in @('Awake', 'CopyOtherDB')) {
@@ -274,7 +278,7 @@ try {
         DynamicTargetsRequiringSeparateCheck = @($dynamic)
         JotunnAssemblyReference = $false
         DynamicHammerTargetsChecked = 2
-        PrivateFieldContractsChecked = 5
+        PrivateFieldContractsChecked = $privateFields
         WheelTranspilerAnchors = $wheelMatches
         SupportCollapseTranspilerAnchors = $supportAnchors
         ConfigPersistenceContractsChecked = 4

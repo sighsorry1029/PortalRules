@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.9
+
+- Added recovery for portal destination maps that keep following the mouse after the button is released when a UI release event is missed or interrupted. Recovery runs after normal UI click handling and does not trigger a teleport by itself.
+- Clear stale mouse-down and drag state when portal destination selection starts or ends. Ordinary map input, held mouse dragging, and gamepad/touch controls retain their existing behavior.
+- Added regression checks for normal clicks, dragging, missed releases, interrupted click handling, and input-device boundaries. Update the host/server and clients together.
+
 ## 1.1.8
 
 - Changed `Default Portal Mode` to `Public` and `Public Access Duration Seconds` to `0` by default, so new ordinary player portals start Public without automatic expiry in new configurations.

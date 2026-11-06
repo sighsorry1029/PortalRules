@@ -25,6 +25,8 @@ internal sealed class PublicPortalMapController
 
     private static readonly TakeInputDelegate? TakeInput = CreateTakeInputDelegate();
 
+    private static readonly Action<Minimap>? ResetMapDrag = CreateMapDragReset();
+
     public static readonly PublicPortalMapController Instance = new();
 
     private static Font? _portalFont;
@@ -143,6 +145,7 @@ internal sealed class PublicPortalMapController
         _playerCollider = playerCollider;
         _lostSourceAreaAt = -1f;
 
+        ResetMapDrag?.Invoke(Minimap.instance);
         OpenMapAt(sourcePortal.transform.position);
         InventoryGui.instance?.Hide();
         EnsureSelectionCursor();
@@ -170,6 +173,44 @@ internal sealed class PublicPortalMapController
             ZCursor.LockState = CursorLockMode.None;
         }
         ZCursor.Show();
+    }
+
+    internal void RecoverReleasedMapDrag()
+    {
+        Minimap? minimap = Minimap.instance;
+        if (!IsSelecting || Player.m_localPlayer == null ||
+            minimap == null || minimap.m_mode != Minimap.MapMode.Large ||
+            minimap.m_largeRoot == null || !minimap.m_largeRoot.activeInHierarchy ||
+            !ZInput.IsMouseActive() || ZInput.IsTouchActive() ||
+            ZInput.IsGamepadActive() || ZInput.GetMouseButton(0))
+        {
+            return;
+        }
+
+        // Called only in LateUpdate, after the UI has had a chance to release
+        // the button. Never synthesize OnMapLeftUp: it could trigger a trip.
+        ResetMapDrag?.Invoke(minimap);
+    }
+
+    private static Action<Minimap>? CreateMapDragReset()
+    {
+        try
+        {
+            var leftDownTime = AccessTools.FieldRefAccess<Minimap, float>("m_leftDownTime");
+            var dragView = AccessTools.FieldRefAccess<Minimap, bool>("m_dragView");
+            return minimap =>
+            {
+                // SetMapMode clears only dragView; a stale down time can arm it again.
+                leftDownTime(minimap) = 0f;
+                dragView(minimap) = false;
+            };
+        }
+        catch (Exception ex)
+        {
+            PortalRulesPlugin.PortalRulesLogger.LogWarning(
+                $"Could not bind Minimap drag state; portal-map drag recovery is disabled: {ex.Message}");
+            return null;
+        }
     }
 
     public void Tick()
@@ -335,6 +376,10 @@ internal sealed class PublicPortalMapController
             return;
         }
 
+        if (IsSelecting && Minimap.instance != null)
+        {
+            ResetMapDrag?.Invoke(Minimap.instance);
+        }
         IsSelecting = false;
         _sourcePortalId = ZDOID.None;
         _sourcePortal = null;

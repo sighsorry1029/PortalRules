@@ -20,7 +20,7 @@ namespace PortalRules;
 public class PortalRulesPlugin : BaseUnityPlugin
 {
     internal const string ModName = "PortalRules";
-    internal const string ModVersion = "1.1.8";
+    internal const string ModVersion = "1.1.9";
     internal const string Author = "sighsorry";
     internal const string ModGUID = $"{Author}.{ModName}";
     internal const string ClanSoftDependencyGuid = "sighsorry.Clan";
@@ -84,6 +84,13 @@ public class PortalRulesPlugin : BaseUnityPlugin
             PublicPortalProtection.InvalidatePresence();
             PublicPortalCatalog.RefreshClanViews();
         }
+    }
+
+    private void LateUpdate()
+    {
+        // Let EventSystem.Update deliver a normal pointer-up (and portal click)
+        // before recovering a drag whose release event was lost.
+        PublicPortalMapController.Instance.RecoverReleasedMapDrag();
     }
 
     private void OnDestroy()
